@@ -1,63 +1,49 @@
-// Create notification sound
-const notificationSound = new Audio("/notification.mp3");
-
+// Simple notification utility that doesn't rely on browser storage
 export const notifications = {
-  // Request permission for desktop notifications
+  // Simple check if notifications are supported
+  isSupported() {
+    return "Notification" in window;
+  },
+
+  // Request permission without storing state
   async requestPermission() {
-    if (!("Notification" in window)) {
-      console.log("This browser does not support desktop notifications");
+    if (!this.isSupported()) {
+      console.log("Notifications not supported");
       return false;
     }
 
-    if (Notification.permission === "granted") {
-      return true;
-    }
-
-    if (Notification.permission !== "denied") {
+    try {
       const permission = await Notification.requestPermission();
       return permission === "granted";
+    } catch (error) {
+      console.error("Error requesting notification permission:", error);
+      return false;
     }
-
-    return false;
   },
 
-  // Play notification sound
-  playSound() {
-    notificationSound.play().catch((error) => {
-      console.log("Error playing notification sound:", error);
-    });
-  },
-
-  // Show desktop notification
+  // Show notification without storing state
   showNotification(title, options = {}) {
-    if (Notification.permission === "granted") {
-      const notification = new Notification(title, {
-        icon: "/favicon.ico",
-        ...options,
-      });
+    if (!this.isSupported()) return;
 
-      // Auto close after 5 seconds
-      setTimeout(() => notification.close(), 5000);
+    try {
+      if (Notification.permission === "granted") {
+        new Notification(title, options);
+      }
+    } catch (error) {
+      console.error("Error showing notification:", error);
     }
   },
 
-  // Handle new order notification
-  async notifyNewOrder(order) {
-    // Play sound
-    this.playSound();
-
-    // Show desktop notification
-    this.showNotification("New Order Received!", {
-      body: `Order #${order.id} - Total: $${order.total_price.toFixed(2)}`,
-      tag: "new-order",
+  // Specific notification methods
+  notifyNewOrder(order) {
+    this.showNotification("New Order Received", {
+      body: `Order #${order.id}\nTotal: ₱${order.total_price}`,
     });
   },
 
-  // Handle order status change notification
-  async notifyStatusChange(order) {
+  notifyStatusChange(order) {
     this.showNotification("Order Status Updated", {
       body: `Order #${order.id} is now ${order.status}`,
-      tag: "status-change",
     });
   },
 };

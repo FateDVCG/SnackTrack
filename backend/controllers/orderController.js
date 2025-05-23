@@ -12,7 +12,8 @@ async function createOrderFromMessage(messageData) {
     // This will be expanded later to handle proper order flow
     const orderData = {
       customerId: messageData.senderId,
-      status: "pending",
+      status: "new",
+      type: "Delivery", // Default type for Messenger orders
       totalPrice: 0, // Will be calculated based on items
       items: [
         {
@@ -64,11 +65,12 @@ async function updateOrderStatus(orderId, status) {
 
     // Send status update to customer
     const statusMessages = {
-      confirmed: "Your order has been confirmed and is being prepared!",
-      ready: "Your order is ready for pickup!",
-      completed: "Thank you for your order! We hope to serve you again soon.",
-      cancelled:
-        "Your order has been cancelled. Please contact us if you have any questions.",
+      accepted: "Your order has been accepted and is being prepared!",
+      finished: "Your order is made and will be delivered shortly.",
+      completed:
+        "Your order has been completed. Thank you for ordering with us!",
+      voided:
+        "Your order has been voided. Please contact us if you have any questions.",
     };
 
     if (statusMessages[status]) {
@@ -86,9 +88,9 @@ async function updateOrderStatus(orderId, status) {
 }
 
 /**
- * Gets a single order by ID
+ * Gets an order by ID
  * @param {string} orderId - ID of the order to fetch
- * @returns {Promise<Object>} Order details
+ * @returns {Promise<Object>} Order object
  */
 async function getOrderById(orderId) {
   try {
