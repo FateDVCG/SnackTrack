@@ -23,17 +23,19 @@ async function createOrder(orderData) {
       INSERT INTO orders (
         customer_id,
         status,
+        type,
         total_price,
         items,
         special_instructions,
         created_at
-      ) VALUES ($1, $2, $3, $4, $5, NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
       RETURNING *
     `;
 
     const orderValues = [
       orderData.customerId,
-      orderData.status || "pending",
+      orderData.status || "new",
+      orderData.type || "Delivery",
       orderData.totalPrice,
       JSON.stringify(orderData.items),
       orderData.specialInstructions,
@@ -52,35 +54,39 @@ async function createOrder(orderData) {
 }
 
 /**
- * Gets orders from the database with optional filters
+ * Gets all orders with optional filters
  * @param {Object} filters - Optional filters (status, customerId, dateRange)
  * @returns {Promise<Array>} Array of orders
  */
 async function getOrders(filters = {}) {
-  let query = "SELECT * FROM orders";
+  let query = `
+    SELECT * 
+    FROM orders 
+    WHERE 1=1
+  `;
   const values = [];
-  const conditions = [];
+  let valueIndex = 1;
 
   if (filters.status) {
+    query += ` AND status = $${valueIndex}`;
     values.push(filters.status);
-    conditions.push(`status = $${values.length}`);
+    valueIndex++;
   }
 
   if (filters.customerId) {
+    query += ` AND customer_id = $${valueIndex}`;
     values.push(filters.customerId);
-    conditions.push(`customer_id = $${values.length}`);
+    valueIndex++;
   }
 
   if (filters.dateRange) {
+    query += ` AND created_at >= $${valueIndex}`;
     values.push(filters.dateRange.start);
-    values.push(filters.dateRange.end);
-    conditions.push(
-      `created_at BETWEEN $${values.length - 1} AND $${values.length}`
-    );
-  }
+    valueIndex++;
 
-  if (conditions.length > 0) {
-    query += " WHERE " + conditions.join(" AND ");
+    query += ` AND created_at <= $${valueIndex}`;
+    values.push(filters.dateRange.end);
+    valueIndex++;
   }
 
   query += " ORDER BY created_at DESC";
@@ -92,10 +98,18 @@ async function getOrders(filters = {}) {
 /**
  * Updates the status of an order
  * @param {string} orderId - ID of the order to update
- * @param {string} status - New status
+ * @param {string} status - New status (new, accepted, finished, completed, voided)
  * @returns {Promise<Object>} Updated order
  */
 async function updateOrderStatus(orderId, status) {
+  // Validate status
+  const validStatuses = ["new", "accepted", "finished", "completed", "voided"];
+  if (!validStatuses.includes(status)) {
+    throw new Error(
+      `Invalid status: ${status}. Must be one of: ${validStatuses.join(", ")}`
+    );
+  }
+
   const query = `
     UPDATE orders 
     SET 
@@ -115,12 +129,17 @@ async function updateOrderStatus(orderId, status) {
 }
 
 /**
- * Gets a single order by ID
+ * Gets an order by ID
  * @param {string} orderId - ID of the order to fetch
- * @returns {Promise<Object>} Order details
+ * @returns {Promise<Object>} Order object
  */
 async function getOrderById(orderId) {
-  const query = "SELECT * FROM orders WHERE id = $1";
+  const query = `
+    SELECT * 
+    FROM orders 
+    WHERE id = $1
+  `;
+
   const result = await pool.query(query, [orderId]);
 
   if (result.rows.length === 0) {

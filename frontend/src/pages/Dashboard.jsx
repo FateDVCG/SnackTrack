@@ -1,114 +1,137 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   Container,
   Typography,
-  Grid,
-  TextField,
   Box,
-  ToggleButtonGroup,
-  ToggleButton,
-  FormControl,
-  Select,
-  MenuItem,
-  InputLabel,
-  Skeleton,
   Paper,
-  LinearProgress,
-  IconButton,
-  Tooltip,
+  Button,
+  Badge,
   Snackbar,
   Alert,
-  Badge,
-  Pagination,
-  Chip,
-  Button,
-  Divider,
+  Tabs,
+  Tab,
 } from "@mui/material";
-import NotificationsIcon from "@mui/icons-material/Notifications";
-import NotificationsOffIcon from "@mui/icons-material/NotificationsOff";
+import OrderCard from "../components/OrderCard";
 import { orderService } from "../services/orderService";
+import { CurrencyContext } from "../App";
 
 const Dashboard = () => {
-  const [orders, setOrders] = useState([]);
+  // State for orders
+  const [newOrders, setNewOrders] = useState([]);
+  const [acceptedOrders, setAcceptedOrders] = useState([]);
+  const [finishedOrders, setFinishedOrders] = useState([]);
+  const [completedOrders, setCompletedOrders] = useState([]);
+  const [voidedOrders, setVoidedOrders] = useState([]);
+
+  // State for filters
+  const [orderTypeFilter, setOrderTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("accepted");
+
+  // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "info",
   });
-  const [page, setPage] = useState(1);
-  const ordersPerPage = 10;
 
-  // Filter and sort states
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
+  const { currency } = useContext(CurrencyContext);
 
-  // Active status sections configuration
-  const activeStatusSections = [
-    {
-      status: "pending",
-      label: "Pending Orders",
-      color: "warning.main",
-      actionLabel: "MARK AS CONFIRMED",
-    },
-    {
-      status: "confirmed",
-      label: "Confirmed Orders",
-      color: "info.main",
-      actionLabel: "MARK AS READY",
-    },
-    {
-      status: "ready",
-      label: "Ready for Pickup",
-      color: "success.main",
-      actionLabel: "MARK AS COMPLETED",
-    },
-  ];
+  useEffect(() => {
+    fetchOrders();
+    // Set up polling for new orders
+    const interval = setInterval(fetchOrders, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
-  const completedStatusSection = {
-    status: "completed",
-    label: "Completed Orders",
-    color: "success.dark",
-  };
-
-  // Fetch orders
   const fetchOrders = async () => {
     try {
-      setRefreshing(true);
-      const data = await orderService.getOrders();
-      setOrders(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-      showSnackbar("Failed to fetch orders", "error");
-    } finally {
+      const orders = await orderService.getOrders();
+
+      // Sort orders by status
+      setNewOrders(orders.filter((order) => order.status === "new"));
+      setAcceptedOrders(orders.filter((order) => order.status === "accepted"));
+      setFinishedOrders(orders.filter((order) => order.status === "finished"));
+      setCompletedOrders(
+        orders.filter((order) => order.status === "completed")
+      );
+      setVoidedOrders(orders.filter((order) => order.status === "voided"));
+
       setLoading(false);
-      setRefreshing(false);
+    } catch (err) {
+      console.error("Error fetching orders:", err);
+      setError("Failed to fetch orders");
+      setLoading(false);
     }
   };
 
-  // Initial fetch
-  useEffect(() => {
-    fetchOrders();
-    // Set up periodic refresh every 30 seconds
-    const intervalId = setInterval(fetchOrders, 30000);
-    return () => clearInterval(intervalId);
-  }, []);
+  const handleOrderUpdate = (updatedOrder) => {
+    // Remove order from its current status list
+    setNewOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
+    setAcceptedOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
+    setFinishedOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
+    setCompletedOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
+    setVoidedOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
+
+    // Add order to its new status list
+    switch (updatedOrder.status) {
+      case "accepted":
+        setAcceptedOrders((prev) => [...prev, updatedOrder]);
+        break;
+      case "finished":
+        setFinishedOrders((prev) => [...prev, updatedOrder]);
+        break;
+      case "completed":
+        setCompletedOrders((prev) => [...prev, updatedOrder]);
+        break;
+      case "voided":
+        setVoidedOrders((prev) => [...prev, updatedOrder]);
+        break;
+      default:
+        break;
+    }
+  };
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
-      await orderService.updateOrderStatus(orderId, newStatus);
-      fetchOrders(); // Refresh orders after update
-      showSnackbar(`Order #${orderId} marked as ${newStatus}`, "success");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update order status"
+      const updatedOrder = await orderService.updateOrderStatus(
+        orderId,
+        newStatus
       );
+      handleOrderUpdate(updatedOrder);
+      showSnackbar(`Order ${newStatus} successfully`, "success");
+    } catch (err) {
+      console.error("Error updating order status:", err);
       showSnackbar("Failed to update order status", "error");
+    }
+  };
+
+  const handleAcceptOrder = async (orderId) => {
+    try {
+      const updatedOrder = await orderService.updateOrderStatus(
+        orderId,
+        "accepted"
+      );
+      handleOrderUpdate(updatedOrder);
+      showSnackbar("Order accepted successfully", "success");
+    } catch (err) {
+      console.error("Error accepting order:", err);
+      showSnackbar("Failed to accept order", "error");
+    }
+  };
+
+  const handleVoidOrder = async (orderId) => {
+    try {
+      const updatedOrder = await orderService.updateOrderStatus(
+        orderId,
+        "voided"
+      );
+      handleOrderUpdate(updatedOrder);
+      showSnackbar("Order voided successfully", "success");
+    } catch (err) {
+      console.error("Error voiding order:", err);
+      showSnackbar("Failed to void order", "error");
     }
   };
 
@@ -116,547 +139,343 @@ const Dashboard = () => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const toggleNotifications = () => {
-    setNotificationsEnabled(!notificationsEnabled);
-    showSnackbar(
-      notificationsEnabled ? "Notifications disabled" : "Notifications enabled",
-      "info"
-    );
-  };
-
-  // Filter and sort functions
-  const filterOrders = (orders) => {
-    return orders.filter((order) => {
-      if (statusFilter !== "all" && order.status !== statusFilter) {
-        return false;
-      }
-
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        const hasMatchingItem = order.items.some((item) =>
-          item.name.toLowerCase().includes(searchLower)
-        );
-        const orderIdMatch = order.id.toString().includes(searchLower);
-        return hasMatchingItem || orderIdMatch;
-      }
-
-      return true;
-    });
-  };
-
-  const sortOrders = (orders) => {
-    return [...orders].sort((a, b) => {
-      switch (sortBy) {
-        case "newest":
-          return new Date(b.created_at) - new Date(a.created_at);
-        case "oldest":
-          return new Date(a.created_at) - new Date(b.created_at);
-        case "highest":
-          return b.total_price - a.total_price;
-        case "lowest":
-          return a.total_price - b.total_price;
-        default:
-          return 0;
-      }
-    });
-  };
-
-  // Group orders by status
-  const groupOrdersByStatus = (orders) => {
-    const groups = {
-      pending: [],
-      confirmed: [],
-      ready: [],
-      completed: [],
-      cancelled: [],
-    };
-
-    orders.forEach((order) => {
-      if (groups[order.status]) {
-        groups[order.status].push(order);
-      }
-    });
-
-    return groups;
-  };
-
-  // Process orders through filters and sorting
-  const filteredOrders = filterOrders(orders);
-  const sortedOrders = sortOrders(filteredOrders);
-
-  // Paginate orders
-  const paginatedOrders = sortedOrders.slice(
-    (page - 1) * ordersPerPage,
-    page * ordersPerPage
+  const filteredNewOrders = newOrders.filter(
+    (order) =>
+      orderTypeFilter === "all" ||
+      order.type.toLowerCase().replace(" ", "_") === orderTypeFilter
   );
-  const totalPages = Math.ceil(sortedOrders.length / ordersPerPage);
 
-  const groupedOrders = groupOrdersByStatus(paginatedOrders);
-
-  // Format price safely
-  const formatPrice = (price) => {
-    const numPrice = Number(price);
-    return isNaN(numPrice) ? "0.00" : numPrice.toFixed(2);
-  };
-
-  // Loading skeleton
   if (loading) {
     return (
-      <Container maxWidth={false} sx={{ mt: 4, mb: 4, height: "100vh", p: 3 }}>
-        <Skeleton variant="text" width="300px" height={60} />
-        <Box sx={{ mb: 4 }}>
-          <Grid container spacing={2}>
-            {[1, 2, 3].map((i) => (
-              <Grid key={i} flex={1}>
-                <Skeleton variant="rectangular" height={56} />
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      </Container>
-    );
-  }
-
-  if (error) {
-    return (
-      <Container maxWidth={false}>
-        <Typography color="error">Error: {error}</Typography>
-      </Container>
+      <Box
+        sx={{
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Typography>Loading...</Typography>
+      </Box>
     );
   }
 
   return (
     <Box
       sx={{
-        minHeight: "100vh",
-        backgroundColor: (theme) => theme.palette.grey[100],
-        pt: 3,
-        pb: 3,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        width: "100%",
+        overflow: "hidden",
       }}
     >
-      <Container maxWidth={false} sx={{ px: 3 }}>
-        {refreshing && (
-          <Box
-            sx={{
-              width: "100%",
-              position: "fixed",
-              top: 0,
-              left: 0,
-              zIndex: 9999,
-            }}
-          >
-            <LinearProgress />
-          </Box>
-        )}
-
-        {/* Header */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" sx={{ mb: 2 }}>
-            Order Dashboard
-          </Typography>
-
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Tooltip
-              title={
-                notificationsEnabled
-                  ? "Disable notifications"
-                  : "Enable notifications"
-              }
-            >
-              <IconButton
-                onClick={toggleNotifications}
-                color={notificationsEnabled ? "primary" : "default"}
-                size="small"
-              >
-                {notificationsEnabled ? (
-                  <NotificationsIcon />
-                ) : (
-                  <NotificationsOffIcon />
-                )}
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
-
-        {/* Filters */}
-        <Grid container spacing={2} sx={{ mb: 4 }}>
-          <Grid flex={1}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Search orders"
-              variant="outlined"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by order ID or item name"
-            />
-          </Grid>
-          <Grid flex={1}>
-            <Paper sx={{ p: 0.5 }}>
-              <ToggleButtonGroup
-                value={statusFilter}
-                exclusive
-                onChange={(e, newValue) => {
-                  if (newValue !== null) {
-                    setStatusFilter(newValue);
-                    setPage(1);
-                  }
-                }}
-                fullWidth
-                size="small"
-              >
-                <ToggleButton value="all">All Active</ToggleButton>
-                <ToggleButton value="pending">Pending</ToggleButton>
-                <ToggleButton value="confirmed">Confirmed</ToggleButton>
-                <ToggleButton value="ready">Ready</ToggleButton>
-                <ToggleButton value="completed">Completed</ToggleButton>
-              </ToggleButtonGroup>
-            </Paper>
-          </Grid>
-          <Grid flex={1}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Sort By</InputLabel>
-              <Select
-                value={sortBy}
-                label="Sort By"
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <MenuItem value="newest">Newest First</MenuItem>
-                <MenuItem value="oldest">Oldest First</MenuItem>
-                <MenuItem value="highest">Highest Amount</MenuItem>
-                <MenuItem value="lowest">Lowest Amount</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-
-        {/* Orders Count and Pagination */}
-        <Box
+      {/* Main Content */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 2,
+          p: 2,
+          flex: 1,
+          overflow: "hidden",
+        }}
+      >
+        {/* Left Panel - New Orders */}
+        <Paper
+          elevation={0}
           sx={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 3,
-            flexWrap: "wrap",
-            gap: 2,
+            flexDirection: "column",
+            overflow: "hidden",
+            height: "100%",
           }}
         >
-          <Typography variant="subtitle1">
-            Showing {paginatedOrders.length} of {sortedOrders.length} orders
-          </Typography>
-          {totalPages > 1 && (
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              color="primary"
-              size="small"
-            />
-          )}
-        </Box>
-
-        {/* Active Orders */}
-        {statusFilter !== "completed" && (
-          <Grid container spacing={3}>
-            {activeStatusSections.map(
-              ({ status, label, color, actionLabel }) => {
-                const statusOrders =
-                  statusFilter === "all"
-                    ? groupedOrders[status]
-                    : status === statusFilter
-                    ? groupedOrders[status]
-                    : [];
-
-                if (!statusOrders?.length) return null;
-
-                return (
-                  <Grid key={status} style={{ width: "100%" }}>
-                    <Paper
-                      elevation={2}
-                      sx={{
-                        p: 3,
-                        mb: 3,
-                        borderLeft: 6,
-                        borderColor: color,
-                        backgroundColor: "white",
-                      }}
-                    >
-                      <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-                        {label} ({statusOrders?.length || 0})
-                      </Typography>
-                      <Grid container spacing={3}>
-                        {statusOrders?.map((order) => (
-                          <Grid
-                            key={order.id}
-                            style={{ width: "25%", padding: "12px" }}
-                          >
-                            <Paper
-                              elevation={1}
-                              sx={{
-                                p: 2,
-                                height: "100%",
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "space-between",
-                              }}
-                            >
-                              <Box>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    mb: 1,
-                                  }}
-                                >
-                                  <Typography variant="h6">
-                                    #{order.id}
-                                  </Typography>
-                                  <Chip
-                                    label={
-                                      order.status.charAt(0).toUpperCase() +
-                                      order.status.slice(1)
-                                    }
-                                    color={
-                                      order.status === "pending"
-                                        ? "warning"
-                                        : order.status === "confirmed"
-                                        ? "info"
-                                        : order.status === "ready"
-                                        ? "success"
-                                        : "default"
-                                    }
-                                    size="small"
-                                  />
-                                </Box>
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{ mb: 2 }}
-                                >
-                                  {new Date(order.created_at).toLocaleString()}
-                                </Typography>
-                                <Divider sx={{ mb: 2 }} />
-                                <Box sx={{ mb: 2 }}>
-                                  {order.items.map((item, index) => (
-                                    <Box
-                                      key={index}
-                                      sx={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        mb: 1,
-                                      }}
-                                    >
-                                      <Typography variant="body2">
-                                        {item.name}
-                                      </Typography>
-                                      <Typography variant="body2">
-                                        ${formatPrice(item.price)}
-                                      </Typography>
-                                    </Box>
-                                  ))}
-                                </Box>
-                                <Divider sx={{ mb: 2 }} />
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    mb: 2,
-                                  }}
-                                >
-                                  <Typography variant="subtitle2">
-                                    Total:
-                                  </Typography>
-                                  <Typography variant="subtitle2">
-                                    ${formatPrice(order.total_price)}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 1,
-                                  mt: 2,
-                                }}
-                              >
-                                <Button
-                                  variant="contained"
-                                  color={
-                                    status === "pending"
-                                      ? "warning"
-                                      : status === "confirmed"
-                                      ? "info"
-                                      : "success"
-                                  }
-                                  fullWidth
-                                  onClick={() =>
-                                    handleStatusChange(
-                                      order.id,
-                                      status === "pending"
-                                        ? "confirmed"
-                                        : status === "confirmed"
-                                        ? "ready"
-                                        : "completed"
-                                    )
-                                  }
-                                >
-                                  {actionLabel}
-                                </Button>
-                                {status === "pending" && (
-                                  <Button
-                                    variant="outlined"
-                                    color="error"
-                                    fullWidth
-                                    onClick={() =>
-                                      handleStatusChange(order.id, "cancelled")
-                                    }
-                                  >
-                                    CANCEL ORDER
-                                  </Button>
-                                )}
-                              </Box>
-                            </Paper>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Paper>
-                  </Grid>
-                );
-              }
-            )}
-          </Grid>
-        )}
-
-        {/* Completed Orders */}
-        {(statusFilter === "completed" || statusFilter === "all") &&
-          groupedOrders.completed?.length > 0 && (
-            <Grid container spacing={3}>
-              <Grid style={{ width: "100%" }}>
-                <Paper
-                  elevation={2}
+          {/* Order Type Tabs */}
+          <Tabs
+            value={orderTypeFilter}
+            onChange={(e, v) => setOrderTypeFilter(v)}
+            variant="fullWidth"
+            sx={{ borderBottom: 1, borderColor: "divider" }}
+          >
+            <Tab
+              label={
+                <Badge
+                  badgeContent={newOrders.length}
+                  color="error"
                   sx={{
-                    p: 3,
-                    mb: 3,
-                    borderLeft: 6,
-                    borderColor: completedStatusSection.color,
-                    backgroundColor: "white",
+                    "& .MuiBadge-badge": {
+                      right: -3,
+                      top: 3,
+                      padding: "0 4px",
+                      minWidth: "20px",
+                      height: "20px",
+                    },
                   }}
                 >
-                  <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-                    {completedStatusSection.label} (
-                    {groupedOrders.completed?.length || 0})
-                  </Typography>
-                  <Grid container spacing={3}>
-                    {groupedOrders.completed?.map((order) => (
-                      <Grid
-                        key={order.id}
-                        style={{ width: "25%", padding: "12px" }}
-                      >
-                        <Paper
-                          elevation={1}
-                          sx={{
-                            p: 2,
-                            height: "100%",
-                            display: "flex",
-                            flexDirection: "column",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              mb: 1,
-                            }}
-                          >
-                            <Typography variant="h6">#{order.id}</Typography>
-                            <Chip
-                              label="Completed"
-                              color="success"
-                              size="small"
-                            />
-                          </Box>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mb: 2 }}
-                          >
-                            {new Date(order.created_at).toLocaleString()}
-                          </Typography>
-                          <Divider sx={{ mb: 2 }} />
-                          <Box sx={{ mb: 2 }}>
-                            {order.items.map((item, index) => (
-                              <Box
-                                key={index}
-                                sx={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  mb: 1,
-                                }}
-                              >
-                                <Typography variant="body2">
-                                  {item.name}
-                                </Typography>
-                                <Typography variant="body2">
-                                  ${formatPrice(item.price)}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Box>
-                          <Divider sx={{ mb: 2 }} />
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <Typography variant="subtitle2">Total:</Typography>
-                            <Typography variant="subtitle2">
-                              ${formatPrice(order.total_price)}
-                            </Typography>
-                          </Box>
-                        </Paper>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Paper>
-              </Grid>
-            </Grid>
-          )}
-
-        {/* No Results */}
-        {sortedOrders.length === 0 && (
-          <Paper sx={{ p: 4, textAlign: "center", mt: 2 }}>
-            <Typography variant="h6">
-              No orders found matching your criteria
-            </Typography>
-          </Paper>
-        )}
-
-        {/* Bottom Pagination */}
-        {totalPages > 1 && (
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              color="primary"
-              size="small"
+                  <Box sx={{ pr: 2 }}>All</Box>
+                </Badge>
+              }
+              value="all"
             />
-          </Box>
-        )}
+            <Tab
+              label={
+                <Badge
+                  badgeContent={
+                    newOrders.filter((o) => o.type === "Dine In").length
+                  }
+                  color="error"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      right: -3,
+                      top: 3,
+                      padding: "0 4px",
+                      minWidth: "20px",
+                      height: "20px",
+                    },
+                  }}
+                >
+                  <Box sx={{ pr: 2 }}>Dine In</Box>
+                </Badge>
+              }
+              value="dine_in"
+            />
+            <Tab
+              label={
+                <Badge
+                  badgeContent={
+                    newOrders.filter((o) => o.type === "Take Out").length
+                  }
+                  color="error"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      right: -3,
+                      top: 3,
+                      padding: "0 4px",
+                      minWidth: "20px",
+                      height: "20px",
+                    },
+                  }}
+                >
+                  <Box sx={{ pr: 2 }}>Take Out</Box>
+                </Badge>
+              }
+              value="take_out"
+            />
+            <Tab
+              label={
+                <Badge
+                  badgeContent={
+                    newOrders.filter((o) => o.type === "Delivery").length
+                  }
+                  color="error"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      right: -3,
+                      top: 3,
+                      padding: "0 4px",
+                      minWidth: "20px",
+                      height: "20px",
+                    },
+                  }}
+                >
+                  <Box sx={{ pr: 2 }}>Delivery</Box>
+                </Badge>
+              }
+              value="delivery"
+            />
+          </Tabs>
 
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={3000}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          {/* New Orders List */}
+          <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: 2,
+                "& .MuiPaper-root": {
+                  background: (theme) => `linear-gradient(135deg, 
+                    ${theme.palette.background.paper} 0%, 
+                    ${theme.palette.background.paper}80 100%)`,
+                  boxShadow: (theme) =>
+                    `0 8px 32px 0 ${theme.palette.primary.main}20`,
+                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                  backdropFilter: "blur(8px)",
+                  transition: "all 0.3s ease",
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: (theme) =>
+                      `0 12px 40px 0 ${theme.palette.primary.main}30`,
+                  },
+                },
+              }}
+            >
+              {filteredNewOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onAccept={handleAcceptOrder}
+                  onVoid={handleVoidOrder}
+                />
+              ))}
+            </Box>
+          </Box>
+        </Paper>
+
+        {/* Right Panel - Order Status */}
+        <Paper
+          elevation={0}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            height: "100%",
+          }}
         >
-          <Alert severity={snackbar.severity} sx={{ width: "100%" }}>
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Container>
+          {/* Status Tabs */}
+          <Tabs
+            value={statusFilter}
+            onChange={(e, v) => setStatusFilter(v)}
+            variant="fullWidth"
+            sx={{ borderBottom: 1, borderColor: "divider" }}
+          >
+            <Tab
+              label={
+                <Badge
+                  badgeContent={acceptedOrders.length}
+                  color="warning"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      right: -3,
+                      top: 3,
+                      padding: "0 4px",
+                      minWidth: "20px",
+                      height: "20px",
+                    },
+                  }}
+                >
+                  <Box sx={{ pr: 2 }}>Accepted</Box>
+                </Badge>
+              }
+              value="accepted"
+            />
+            <Tab
+              label={
+                <Badge
+                  badgeContent={finishedOrders.length}
+                  color="info"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      right: -3,
+                      top: 3,
+                      padding: "0 4px",
+                      minWidth: "20px",
+                      height: "20px",
+                    },
+                  }}
+                >
+                  <Box sx={{ pr: 2 }}>Finished</Box>
+                </Badge>
+              }
+              value="finished"
+            />
+            <Tab
+              label={
+                <Badge
+                  badgeContent={completedOrders.length}
+                  color="success"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      right: -3,
+                      top: 3,
+                      padding: "0 4px",
+                      minWidth: "20px",
+                      height: "20px",
+                    },
+                  }}
+                >
+                  <Box sx={{ pr: 2 }}>Completed</Box>
+                </Badge>
+              }
+              value="completed"
+            />
+            <Tab
+              label={
+                <Badge
+                  badgeContent={voidedOrders.length}
+                  color="default"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      right: -3,
+                      top: 3,
+                      padding: "0 4px",
+                      minWidth: "20px",
+                      height: "20px",
+                    },
+                  }}
+                >
+                  <Box sx={{ pr: 2 }}>Voided</Box>
+                </Badge>
+              }
+              value="voided"
+            />
+          </Tabs>
+
+          {/* Status-filtered Orders */}
+          <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: 2,
+              }}
+            >
+              {statusFilter === "accepted" &&
+                acceptedOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    onStatusChange={handleStatusChange}
+                  />
+                ))}
+              {statusFilter === "finished" &&
+                finishedOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    onStatusChange={handleStatusChange}
+                  />
+                ))}
+              {statusFilter === "completed" &&
+                completedOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    onStatusChange={handleStatusChange}
+                  />
+                ))}
+              {statusFilter === "voided" &&
+                voidedOrders.map((order) => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
