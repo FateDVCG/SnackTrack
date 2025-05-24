@@ -70,9 +70,9 @@ async function getAnalytics(range) {
             : 0,
         },
         topSellingItems: topItems.map((item) => ({
-          name: item.item_name,
-          quantitySold: parseInt(item.quantity_sold),
-          revenue: parseFloat(item.total_revenue),
+          name: item.item_name || "Unknown Item",
+          quantitySold: parseInt(item.quantity_sold) || 0,
+          revenue: parseFloat(item.total_revenue) || 0,
         })),
         revenueOverTime,
         ordersByType,

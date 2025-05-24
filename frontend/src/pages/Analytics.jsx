@@ -316,75 +316,87 @@ const Analytics = () => {
     </Box>
   );
 
-  const TopSellingItems = () => (
-    <>
-      <Typography variant="h6" gutterBottom>
-        Top Selling Items
-      </Typography>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gap: 2,
-        }}
-      >
-        {analytics.topSellingItems && analytics.topSellingItems.length > 0 ? (
-          analytics.topSellingItems.map((item, index) => (
-            <Card key={index}>
-              <CardContent>
-                <Typography variant="h6">{item.name}</Typography>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mt: 2,
-                  }}
-                >
-                  <Typography color="textSecondary">
-                    Quantity Sold: {item.quantitySold}
+  const TopSellingItems = () => {
+    // Calculate the maximum quantity for proper scaling
+    const maxQuantity =
+      analytics.topSellingItems && analytics.topSellingItems.length > 0
+        ? Math.max(
+            ...analytics.topSellingItems.map((item) => item.quantitySold || 0)
+          )
+        : 1;
+
+    return (
+      <>
+        <Typography variant="h6" gutterBottom>
+          Top Selling Items
+        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: 2,
+          }}
+        >
+          {analytics.topSellingItems && analytics.topSellingItems.length > 0 ? (
+            analytics.topSellingItems.map((item, index) => (
+              <Card key={index}>
+                <CardContent>
+                  <Typography variant="h6">
+                    {item.name || "Unknown Item"}
                   </Typography>
-                  <Typography color="primary">
-                    {currency} {item.revenue.toFixed(2)}
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    width: "100%",
-                    height: 4,
-                    bgcolor: "rgba(25, 118, 210, 0.1)",
-                    mt: 1,
-                    borderRadius: 2,
-                    overflow: "hidden",
-                  }}
-                >
                   <Box
                     sx={{
-                      width: `${
-                        (item.quantitySold /
-                          analytics.topSellingItems[0].quantitySold) *
-                        100
-                      }%`,
-                      height: "100%",
-                      bgcolor: "primary.main",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mt: 2,
                     }}
-                  />
-                </Box>
+                  >
+                    <Typography color="textSecondary">
+                      Quantity Sold: {item.quantitySold || 0}
+                    </Typography>
+                    <Typography color="primary">
+                      {currency} {(item.revenue || 0).toFixed(2)}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      width: "100%",
+                      height: 4,
+                      bgcolor: "rgba(25, 118, 210, 0.1)",
+                      mt: 1,
+                      borderRadius: 2,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: `${
+                          maxQuantity
+                            ? ((item.quantitySold || 0) / maxQuantity) * 100
+                            : 0
+                        }%`,
+                        height: "100%",
+                        bgcolor: "primary.main",
+                      }}
+                    />
+                  </Box>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" align="center">
+                  No top selling items data available
+                </Typography>
               </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" align="center">
-                No top selling items data available
-              </Typography>
-            </CardContent>
-          </Card>
-        )}
-      </Box>
-    </>
-  );
+          )}
+        </Box>
+      </>
+    );
+  };
 
   return (
     <Box
