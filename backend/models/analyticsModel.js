@@ -79,7 +79,7 @@ async function getTopSellingItems(range, limit = 5) {
         jsonb_array_elements(items::jsonb) as item
       FROM orders 
       WHERE ${intervalQuery}
-        AND status = 'completed'
+        AND status IN ('completed', 'finished', 'accepted')
     )
     SELECT 
       item->>'name' as item_name,
@@ -140,8 +140,122 @@ async function getHourlyDistribution(range) {
   }
 }
 
+/**
+ * Gets revenue over time for a specific range
+ * @param {string} range - 'day', 'week', or 'month'
+ * @returns {Promise<Array>} Revenue time series data
+ */
+async function getRevenueOverTime(range) {
+  let timeGroup, intervalQuery;
+  switch (range) {
+    case "day":
+      timeGroup = "EXTRACT(HOUR FROM created_at)";
+      intervalQuery = "created_at >= CURRENT_DATE";
+      break;
+    case "week":
+      timeGroup = "EXTRACT(DOW FROM created_at)";
+      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
+      break;
+    case "month":
+      timeGroup = "EXTRACT(DAY FROM created_at)";
+      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
+      break;
+    default:
+      throw new Error("Invalid range specified");
+  }
+
+  const query = `
+    SELECT 
+      ${timeGroup} as time_unit,
+      SUM(total_price) as revenue,
+      COUNT(*) as count
+    FROM orders 
+    WHERE ${intervalQuery}
+      AND status IN ('completed', 'finished', 'accepted')
+    GROUP BY time_unit
+    ORDER BY time_unit
+  `;
+
+  try {
+    const result = await pool.query(query);
+    return result.rows;
+  } catch (error) {
+    console.error("Error getting revenue over time:", error);
+    throw error;
+  }
+}
+
+/**
+ * Gets orders by type with time distribution
+ * @param {string} range - 'day', 'week', or 'month'
+ * @returns {Promise<Array>} Orders by type data
+ */
+async function getOrdersByType(range) {
+  let timeGroup, intervalQuery;
+  switch (range) {
+    case "day":
+      timeGroup = "EXTRACT(HOUR FROM created_at)";
+      intervalQuery = "created_at >= CURRENT_DATE";
+      break;
+    case "week":
+      timeGroup = "EXTRACT(DOW FROM created_at)";
+      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
+      break;
+    case "month":
+      timeGroup = "EXTRACT(DAY FROM created_at)";
+      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
+      break;
+    default:
+      throw new Error("Invalid range specified");
+  }
+
+  const query = `
+    WITH time_series AS (
+      SELECT 
+        order_type,
+        ${timeGroup} as time_unit,
+        COUNT(*) as count
+      FROM orders 
+      WHERE ${intervalQuery}
+        AND status IN ('completed', 'finished', 'accepted')
+      GROUP BY order_type, time_unit
+    ),
+    type_totals AS (
+      SELECT 
+        order_type,
+        COUNT(*) as total_count
+      FROM orders 
+      WHERE ${intervalQuery}
+        AND status IN ('completed', 'finished', 'accepted')
+      GROUP BY order_type
+    )
+    SELECT 
+      t.order_type as type,
+      t.total_count as count,
+      json_agg(
+        json_build_object(
+          'time_unit', COALESCE(ts.time_unit, 0),
+          'count', COALESCE(ts.count, 0)
+        ) ORDER BY ts.time_unit
+      ) as by_time
+    FROM type_totals t
+    LEFT JOIN time_series ts ON t.order_type = ts.order_type
+    GROUP BY t.order_type, t.total_count
+  `;
+
+  try {
+    const result = await pool.query(query);
+    return result.rows;
+  } catch (error) {
+    console.error("Error getting orders by type:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   getSalesAnalytics,
   getTopSellingItems,
   getHourlyDistribution,
+  getRevenueOverTime,
+  getOrdersByType,
 };

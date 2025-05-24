@@ -5,6 +5,7 @@ const cors = require("cors");
 const webhookRoutes = require("./routes/webhook");
 const orderRoutes = require("./routes/orders");
 const analyticsRoutes = require("./routes/analytics");
+const menuItemsRoutes = require("./routes/menuItems");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -46,6 +47,7 @@ app.get("/", (req, res) => {
 app.use("/webhook", webhookRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/menu-items", menuItemsRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

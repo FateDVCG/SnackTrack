@@ -16,6 +16,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
+import MenuManager from "./components/MenuManager";
 
 // Create a context for currency
 export const CurrencyContext = React.createContext({
@@ -137,6 +138,9 @@ function App() {
                 <Button color="inherit" component={Link} to="/">
                   Orders
                 </Button>
+                <Button color="inherit" component={Link} to="/menu">
+                  Menu
+                </Button>
                 <Button color="inherit" component={Link} to="/analytics">
                   Analytics
                 </Button>
@@ -146,6 +150,7 @@ function App() {
             <Box sx={{ flex: 1, display: "flex", overflow: "hidden" }}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/menu" element={<MenuManager />} />
                 <Route path="/analytics" element={<Analytics />} />
               </Routes>
             </Box>

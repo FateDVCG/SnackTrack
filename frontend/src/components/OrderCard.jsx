@@ -105,8 +105,28 @@ const OrderCard = ({
               #{order.id}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {order.type || "Delivery"}
+              {order.order_type || "Delivery"}
             </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {order.customer_name || "Anonymous Customer"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {order.customer_phone || "No phone"}
+            </Typography>
+            {order.delivery_address && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  mt: 0.5,
+                  backgroundColor: "action.hover",
+                  p: 1,
+                  borderRadius: 1,
+                }}
+              >
+                📍 {order.delivery_address}
+              </Typography>
+            )}
           </Box>
           <Chip
             label={order.status}
@@ -167,13 +187,13 @@ const OrderCard = ({
           <Box
             sx={{
               p: 1.5,
-              bgcolor: "error.light",
+              bgcolor: "error.main",
               borderRadius: 2,
               border: "1px solid",
-              borderColor: "error.main",
+              borderColor: "error.dark",
             }}
           >
-            <Typography variant="body2" color="error.main">
+            <Typography variant="body2" sx={{ color: "white" }}>
               {order.special_instructions}
             </Typography>
           </Box>

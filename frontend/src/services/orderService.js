@@ -1,87 +1,75 @@
-// Simple mock service for orders
-// In a real app, this would make API calls to your backend
-
-const mockOrders = [
-  {
-    id: 1,
-    type: "Dine In",
-    status: "new",
-    table: "A1",
-    items: [
-      { name: "Burger", price: 120.99, quantity: 2 },
-      { name: "Fries", price: 40.99, quantity: 1 },
-    ],
-    total_price: 282.97,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    type: "Delivery",
-    status: "new",
-    items: [
-      { name: "Pizza", price: 150.99, quantity: 1 },
-      { name: "Soda", price: 25.99, quantity: 2 },
-    ],
-    total_price: 202.97,
-    created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 mins ago
-  },
-];
+// Order service for making API calls to the backend
 
 export const orderService = {
   // Get all orders
   async getOrders() {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockOrders);
-      }, 1000);
-    });
+    try {
+      const response = await fetch("/api/orders");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to fetch orders");
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      throw error;
+    }
   },
 
   // Update order status
   async updateOrderStatus(orderId, newStatus) {
-    // Simulate API call
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const order = mockOrders.find((o) => o.id === orderId);
-        if (!order) {
-          reject(new Error(`Order ${orderId} not found`));
-          return;
-        }
+    try {
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
 
-        const updatedOrder = {
-          ...order,
-          status: newStatus,
-        };
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update order status");
+      }
 
-        // Update the mock data
-        const index = mockOrders.findIndex((o) => o.id === orderId);
-        mockOrders[index] = updatedOrder;
-
-        // Simulate sending Messenger notification
-        if (newStatus === "finished") {
-          console.log(
-            "Sending Messenger notification: Your order is made and will be delivered shortly."
-          );
-        }
-
-        resolve(updatedOrder);
-      }, 500);
-    });
+      return await response.json();
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      throw error;
+    }
   },
 
+  // Create a new order
   async createOrder(orderData) {
-    // Set default type to "Delivery" for Messenger orders
-    const order = {
-      ...orderData,
-      type: "Delivery",
-      status: "new",
-      id: mockOrders.length + 1,
-      created_at: new Date().toISOString(),
-    };
+    try {
+      const data = {
+        customerName: orderData.customerName || "Anonymous Customer",
+        customerPhone: orderData.customerPhone,
+        type: orderData.type || "Delivery",
+        totalPrice: orderData.totalPrice,
+        items: orderData.items,
+        deliveryAddress: orderData.deliveryAddress,
+        specialInstructions: orderData.specialInstructions,
+      };
 
-    mockOrders.push(order);
-    return order;
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to create order");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error creating order:", error);
+      throw error;
+    }
   },
 
   // Convert currency (simplified mock implementation)

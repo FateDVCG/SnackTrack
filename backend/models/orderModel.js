@@ -3,10 +3,10 @@ const { Pool } = require("pg");
 // Create a new pool using the connection string from environment variables
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
+  ssl: {
+    rejectUnauthorized: false,
+    require: true,
+  },
 });
 
 /**
@@ -15,84 +15,94 @@ const pool = new Pool({
  * @returns {Promise<Object>} Created order
  */
 async function createOrder(orderData) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  const {
+    customerId,
+    customerName,
+    customerPhone,
+    status,
+    order_type,
+    totalPrice,
+    items,
+    deliveryAddress,
+    specialInstructions,
+  } = orderData;
 
-    const orderQuery = `
-      INSERT INTO orders (
-        customer_id,
-        status,
-        type,
-        total_price,
-        items,
-        special_instructions,
-        created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      RETURNING *
-    `;
+  const query = `
+    INSERT INTO orders (
+      customer_id,
+      customer_name,
+      customer_phone,
+      status,
+      order_type,
+      total_price,
+      items,
+      delivery_address,
+      special_instructions
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *
+  `;
 
-    const orderValues = [
-      orderData.customerId,
-      orderData.status || "new",
-      orderData.type || "Delivery",
-      orderData.totalPrice,
-      JSON.stringify(orderData.items),
-      orderData.specialInstructions,
-    ];
+  const values = [
+    customerId,
+    customerName || "Anonymous Customer",
+    customerPhone || null,
+    status,
+    order_type,
+    totalPrice,
+    JSON.stringify(items),
+    deliveryAddress || null,
+    specialInstructions || null,
+  ];
 
-    const result = await client.query(orderQuery, orderValues);
-    await client.query("COMMIT");
-
-    return result.rows[0];
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const { rows } = await pool.query(query, values);
+  return rows[0];
 }
 
 /**
  * Gets all orders with optional filters
- * @param {Object} filters - Optional filters (status, customerId, dateRange)
+ * @param {Object} filters - Optional filters (status, customerId, customerName, dateRange)
  * @returns {Promise<Array>} Array of orders
  */
 async function getOrders(filters = {}) {
-  let query = `
-    SELECT * 
-    FROM orders 
-    WHERE 1=1
-  `;
+  const conditions = [];
   const values = [];
-  let valueIndex = 1;
+  let paramCount = 1;
 
   if (filters.status) {
-    query += ` AND status = $${valueIndex}`;
+    conditions.push(`status = $${paramCount}`);
     values.push(filters.status);
-    valueIndex++;
+    paramCount++;
   }
 
   if (filters.customerId) {
-    query += ` AND customer_id = $${valueIndex}`;
+    conditions.push(`customer_id = $${paramCount}`);
     values.push(filters.customerId);
-    valueIndex++;
+    paramCount++;
   }
 
-  if (filters.dateRange) {
-    query += ` AND created_at >= $${valueIndex}`;
-    values.push(filters.dateRange.start);
-    valueIndex++;
-
-    query += ` AND created_at <= $${valueIndex}`;
-    values.push(filters.dateRange.end);
-    valueIndex++;
+  if (filters.customerName) {
+    conditions.push(`LOWER(customer_name) LIKE LOWER($${paramCount})`);
+    values.push(`%${filters.customerName}%`);
+    paramCount++;
   }
 
-  query += " ORDER BY created_at DESC";
+  if (filters.customerPhone) {
+    conditions.push(`customer_phone = $${paramCount}`);
+    values.push(filters.customerPhone);
+    paramCount++;
+  }
 
-  const result = await pool.query(query, values);
-  return result.rows;
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const query = `
+    SELECT * FROM orders
+    ${whereClause}
+    ORDER BY created_at DESC
+  `;
+
+  const { rows } = await pool.query(query, values);
+  return rows;
 }
 
 /**
@@ -111,21 +121,14 @@ async function updateOrderStatus(orderId, status) {
   }
 
   const query = `
-    UPDATE orders 
-    SET 
-      status = $1,
-      updated_at = NOW()
+    UPDATE orders
+    SET status = $1
     WHERE id = $2
     RETURNING *
   `;
 
-  const result = await pool.query(query, [status, orderId]);
-
-  if (result.rows.length === 0) {
-    throw new Error(`Order with ID ${orderId} not found`);
-  }
-
-  return result.rows[0];
+  const { rows } = await pool.query(query, [status, orderId]);
+  return rows[0];
 }
 
 /**
@@ -134,19 +137,9 @@ async function updateOrderStatus(orderId, status) {
  * @returns {Promise<Object>} Order object
  */
 async function getOrderById(orderId) {
-  const query = `
-    SELECT * 
-    FROM orders 
-    WHERE id = $1
-  `;
-
-  const result = await pool.query(query, [orderId]);
-
-  if (result.rows.length === 0) {
-    throw new Error(`Order with ID ${orderId} not found`);
-  }
-
-  return result.rows[0];
+  const query = "SELECT * FROM orders WHERE id = $1";
+  const { rows } = await pool.query(query, [orderId]);
+  return rows[0];
 }
 
 module.exports = {

@@ -236,27 +236,44 @@ const Analytics = () => {
         </Typography>
       </Typography>
       <Card sx={{ p: 2, height: 300 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={analytics.revenueOverTime || []}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 12 }}
-              interval={timeRange === "month" ? 2 : 0}
-            />
-            <YAxis />
-            <Tooltip formatter={(value) => `${currency} ${value.toFixed(2)}`} />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="revenue"
-              stroke="#1976d2"
-              strokeWidth={2}
-              dot={{ r: 4 }}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        {analytics.revenueOverTime && analytics.revenueOverTime.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={analytics.revenueOverTime}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 12 }}
+                interval={timeRange === "month" ? 2 : 0}
+              />
+              <YAxis />
+              <Tooltip
+                formatter={(value) => `${currency} ${value.toFixed(2)}`}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="revenue"
+                stroke="#1976d2"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <Box
+            sx={{
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Typography color="text.secondary">
+              No revenue data available
+            </Typography>
+          </Box>
+        )}
       </Card>
     </Box>
   );
@@ -270,16 +287,31 @@ const Analytics = () => {
         </Typography>
       </Typography>
       <Card sx={{ p: 2, height: 300 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={analytics.ordersByType || []}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="type" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="count" fill="#1976d2" />
-          </BarChart>
-        </ResponsiveContainer>
+        {analytics.ordersByType && analytics.ordersByType.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={analytics.ordersByType}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="type" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="count" fill="#1976d2" />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <Box
+            sx={{
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Typography color="text.secondary">
+              No order type data available
+            </Typography>
+          </Box>
+        )}
       </Card>
     </Box>
   );
@@ -296,50 +328,60 @@ const Analytics = () => {
           gap: 2,
         }}
       >
-        {analytics.topSellingItems.map((item, index) => (
-          <Card key={index}>
-            <CardContent>
-              <Typography variant="h6">{item.name}</Typography>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mt: 2,
-                }}
-              >
-                <Typography color="textSecondary">
-                  Quantity Sold: {item.quantitySold}
-                </Typography>
-                <Typography color="primary">
-                  {currency} {item.revenue.toFixed(2)}
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  height: 4,
-                  bgcolor: "rgba(25, 118, 210, 0.1)",
-                  mt: 1,
-                  borderRadius: 2,
-                  overflow: "hidden",
-                }}
-              >
+        {analytics.topSellingItems && analytics.topSellingItems.length > 0 ? (
+          analytics.topSellingItems.map((item, index) => (
+            <Card key={index}>
+              <CardContent>
+                <Typography variant="h6">{item.name}</Typography>
                 <Box
                   sx={{
-                    width: `${
-                      (item.quantitySold /
-                        analytics.topSellingItems[0].quantitySold) *
-                      100
-                    }%`,
-                    height: "100%",
-                    bgcolor: "primary.main",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mt: 2,
                   }}
-                />
-              </Box>
+                >
+                  <Typography color="textSecondary">
+                    Quantity Sold: {item.quantitySold}
+                  </Typography>
+                  <Typography color="primary">
+                    {currency} {item.revenue.toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: 4,
+                    bgcolor: "rgba(25, 118, 210, 0.1)",
+                    mt: 1,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: `${
+                        (item.quantitySold /
+                          analytics.topSellingItems[0].quantitySold) *
+                        100
+                      }%`,
+                      height: "100%",
+                      bgcolor: "primary.main",
+                    }}
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card>
+            <CardContent>
+              <Typography color="text.secondary" align="center">
+                No top selling items data available
+              </Typography>
             </CardContent>
           </Card>
-        ))}
+        )}
       </Box>
     </>
   );

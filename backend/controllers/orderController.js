@@ -1,109 +1,122 @@
 const orderModel = require("../models/orderModel");
-const messengerAPI = require("../utils/messengerAPI");
+let messengerAPI = require("../utils/messengerAPI");
 
 /**
- * Creates a new order from a Messenger message
- * @param {Object} messageData - Parsed message data
- * @returns {Promise<Object>} Created order
+ * Set messenger API implementation (for testing)
  */
-async function createOrderFromMessage(messageData) {
+function __set__messengerAPI(mockAPI) {
+  messengerAPI = mockAPI;
+}
+
+/**
+ * Create a new order
+ */
+async function createOrder(orderData) {
   try {
-    // For now, we'll create a simple order from the message
-    // This will be expanded later to handle proper order flow
-    const orderData = {
-      customerId: messageData.senderId,
+    // Transform the data to match database schema
+    const transformedData = {
+      customerId: orderData.customerPhone, // Use phone as customer ID for manual orders
+      customerName: orderData.customerName,
+      customerPhone: orderData.customerPhone,
       status: "new",
-      type: "Delivery", // Default type for Messenger orders
-      totalPrice: 0, // Will be calculated based on items
-      items: [
-        {
-          type: "message",
-          content: messageData.text || messageData.payload,
-        },
-      ],
-      specialInstructions: "",
+      order_type: orderData.type || "Delivery",
+      totalPrice: parseFloat(orderData.totalPrice),
+      items: orderData.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: parseFloat(item.price),
+        quantity: parseInt(item.quantity),
+      })),
+      deliveryAddress: orderData.deliveryAddress,
+      specialInstructions: orderData.specialInstructions,
     };
 
-    const order = await orderModel.createOrder(orderData);
-
-    // Send confirmation to customer
-    await messengerAPI.sendTextMessage(
-      messageData.senderId,
-      `Thank you! Your order #${order.id} has been received and is being processed.`
-    );
-
-    return order;
+    return await orderModel.createOrder(transformedData);
   } catch (error) {
-    console.error("Error creating order:", error);
+    console.error("Error in createOrder:", error);
     throw error;
   }
 }
 
 /**
- * Gets all orders with optional filters
- * @param {Object} filters - Optional filters (status, customerId, dateRange)
- * @returns {Promise<Array>} Array of orders
+ * Create an order from a parsed message
+ */
+async function createOrderFromMessage({ senderId, parsedOrder }) {
+  const orderData = {
+    customerId: senderId,
+    customerName: parsedOrder.customerName || "Messenger Customer",
+    customerPhone: parsedOrder.customerPhone,
+    status: "new",
+    order_type: "Messenger",
+    totalPrice: calculateTotal(parsedOrder.items),
+    items: parsedOrder.items,
+    deliveryAddress: parsedOrder.address,
+    specialInstructions: parsedOrder.specialInstructions,
+  };
+
+  const order = await orderModel.createOrder(orderData);
+
+  // Format items for confirmation message
+  const itemsList = parsedOrder.items
+    .map(
+      ({ item, quantity }) =>
+        `${quantity}x ${item.name} (₱${item.price * quantity})`
+    )
+    .join("\n");
+
+  // Send detailed confirmation to customer
+  const confirmationMessage =
+    `Thank you${
+      orderData.customerName ? " " + orderData.customerName : ""
+    }! Your order #${order.id} has been received:\n\n` +
+    `${itemsList}\n\n` +
+    `Total: ₱${orderData.totalPrice}\n` +
+    `Delivery Address: ${parsedOrder.address || "Not provided"}\n\n` +
+    `We'll process your order shortly.`;
+
+  await messengerAPI.sendTextMessage(senderId, confirmationMessage);
+
+  return order;
+}
+
+/**
+ * Calculate total price from items
+ */
+function calculateTotal(items) {
+  const total = items.reduce((total, { item, quantity }) => {
+    return total + item.price * quantity;
+  }, 0);
+
+  // Round to 2 decimal places to avoid floating point issues
+  return Math.round(total * 100) / 100;
+}
+
+/**
+ * Get filtered orders
  */
 async function getOrders(filters = {}) {
-  try {
-    return await orderModel.getOrders(filters);
-  } catch (error) {
-    console.error("Error getting orders:", error);
-    throw error;
-  }
+  return await orderModel.getOrders(filters);
 }
 
 /**
- * Updates an order's status and notifies the customer
- * @param {string} orderId - ID of the order to update
- * @param {string} status - New status
- * @returns {Promise<Object>} Updated order
+ * Update order status
  */
 async function updateOrderStatus(orderId, status) {
-  try {
-    const order = await orderModel.updateOrderStatus(orderId, status);
-
-    // Send status update to customer
-    const statusMessages = {
-      accepted: "Your order has been accepted and is being prepared!",
-      finished: "Your order is made and will be delivered shortly.",
-      completed:
-        "Your order has been completed. Thank you for ordering with us!",
-      voided:
-        "Your order has been voided. Please contact us if you have any questions.",
-    };
-
-    if (statusMessages[status]) {
-      await messengerAPI.sendTextMessage(
-        order.customer_id,
-        `Order #${order.id} Update: ${statusMessages[status]}`
-      );
-    }
-
-    return order;
-  } catch (error) {
-    console.error("Error updating order status:", error);
-    throw error;
-  }
+  return await orderModel.updateOrderStatus(orderId, status);
 }
 
 /**
- * Gets an order by ID
- * @param {string} orderId - ID of the order to fetch
- * @returns {Promise<Object>} Order object
+ * Get order by ID
  */
 async function getOrderById(orderId) {
-  try {
-    return await orderModel.getOrderById(orderId);
-  } catch (error) {
-    console.error("Error getting order:", error);
-    throw error;
-  }
+  return await orderModel.getOrderById(orderId);
 }
 
 module.exports = {
+  createOrder,
   createOrderFromMessage,
   getOrders,
   updateOrderStatus,
   getOrderById,
+  __set__messengerAPI,
 };

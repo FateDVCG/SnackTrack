@@ -10,10 +10,13 @@ import {
   Alert,
   Tabs,
   Tab,
+  Dialog,
 } from "@mui/material";
 import OrderCard from "../components/OrderCard";
+import ManualOrderEntry from "../components/ManualOrderEntry";
 import { orderService } from "../services/orderService";
 import { CurrencyContext } from "../App";
+import AddIcon from "@mui/icons-material/Add";
 
 const Dashboard = () => {
   // State for orders
@@ -26,6 +29,9 @@ const Dashboard = () => {
   // State for filters
   const [orderTypeFilter, setOrderTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("accepted");
+
+  // State for manual entry dialog
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -135,6 +141,18 @@ const Dashboard = () => {
     }
   };
 
+  const handleManualOrderSubmit = async (orderData) => {
+    try {
+      const newOrder = await orderService.createOrder(orderData);
+      setNewOrders((prev) => [...prev, newOrder]);
+      setManualEntryOpen(false);
+      showSnackbar("Order created successfully", "success");
+    } catch (err) {
+      console.error("Error creating order:", err);
+      showSnackbar("Failed to create order", "error");
+    }
+  };
+
   const showSnackbar = (message, severity = "info") => {
     setSnackbar({ open: true, message, severity });
   };
@@ -142,7 +160,7 @@ const Dashboard = () => {
   const filteredNewOrders = newOrders.filter(
     (order) =>
       orderTypeFilter === "all" ||
-      order.type.toLowerCase().replace(" ", "_") === orderTypeFilter
+      order.order_type?.toLowerCase() === orderTypeFilter.toLowerCase()
   );
 
   if (loading) {
@@ -170,6 +188,17 @@ const Dashboard = () => {
         overflow: "hidden",
       }}
     >
+      {/* Add Order Button */}
+      <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setManualEntryOpen(true)}
+        >
+          Add Manual Order
+        </Button>
+      </Box>
+
       {/* Main Content */}
       <Box
         sx={{
@@ -222,7 +251,7 @@ const Dashboard = () => {
               label={
                 <Badge
                   badgeContent={
-                    newOrders.filter((o) => o.type === "Dine In").length
+                    newOrders.filter((o) => o.order_type === "Dine In").length
                   }
                   color="error"
                   sx={{
@@ -244,7 +273,7 @@ const Dashboard = () => {
               label={
                 <Badge
                   badgeContent={
-                    newOrders.filter((o) => o.type === "Take Out").length
+                    newOrders.filter((o) => o.order_type === "Take Out").length
                   }
                   color="error"
                   sx={{
@@ -266,7 +295,7 @@ const Dashboard = () => {
               label={
                 <Badge
                   badgeContent={
-                    newOrders.filter((o) => o.type === "Delivery").length
+                    newOrders.filter((o) => o.order_type === "Delivery").length
                   }
                   color="error"
                   sx={{
@@ -462,6 +491,16 @@ const Dashboard = () => {
           </Box>
         </Paper>
       </Box>
+
+      {/* Manual Entry Dialog */}
+      <Dialog
+        open={manualEntryOpen}
+        onClose={() => setManualEntryOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <ManualOrderEntry onOrderSubmit={handleManualOrderSubmit} />
+      </Dialog>
 
       <Snackbar
         open={snackbar.open}

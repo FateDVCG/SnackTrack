@@ -1,12 +1,27 @@
+const orderParser = require("../utils/orderParser");
+const messengerAPI = require("../utils/messengerAPI");
+const menuHelper = require("../utils/menuHelper");
+
 /**
  * Parses a text message from the messaging event
  */
-function parseTextMessage(message) {
+async function parseTextMessage(message) {
+  // If message doesn't match order format, send menu
+  if (!message.text.toLowerCase().includes("name:")) {
+    const menuMessage = await menuHelper.generateMenuMessage();
+    await messengerAPI.sendTextMessage(message.sender.id, menuMessage);
+    return null;
+  }
+
+  // Parse the order from the message text
+  const orderData = await orderParser.parseOrderText(message.text);
+
   return {
     type: "text",
     text: message.text,
     senderId: message.sender.id,
     timestamp: message.timestamp,
+    parsedOrder: orderData,
   };
 }
 
@@ -67,21 +82,23 @@ function parseMessagingEvent(event) {
 /**
  * Process the webhook event from Facebook
  */
-function processWebhook(body) {
+async function processWebhook(body) {
   const { object, entry } = body;
 
   // Checks if this is a page webhook
   if (object === "page") {
     // Iterates over each entry - there may be multiple if batched
-    return entry
-      .flatMap((pageEntry) => {
-        // Gets the message. entry.messaging is an array, but
-        // will only ever contain one message, so we get index 0
-        return pageEntry.messaging.map((messagingEvent) => {
-          return parseMessagingEvent(messagingEvent);
-        });
-      })
-      .filter(Boolean); // Remove null values
+    const promises = entry.flatMap((pageEntry) => {
+      // Gets the message. entry.messaging is an array, but
+      // will only ever contain one message, so we get index 0
+      return pageEntry.messaging.map((messagingEvent) => {
+        return parseMessagingEvent(messagingEvent);
+      });
+    });
+
+    // Wait for all parsing to complete
+    const results = await Promise.all(promises);
+    return results.filter(Boolean); // Remove null values
   }
 
   return [];
@@ -90,4 +107,5 @@ function processWebhook(body) {
 module.exports = {
   processWebhook,
   parseMessagingEvent,
+  parseTextMessage,
 };
