@@ -6,10 +6,12 @@ const menuItemModel = require("../models/menuItemModel");
 router.get("/", async (req, res) => {
   try {
     const items = await menuItemModel.getAllMenuItems();
-    res.json(items);
+    res.json({ success: true, data: items });
   } catch (error) {
     console.error("Error fetching menu items:", error);
-    res.status(500).json({ error: "Failed to fetch menu items" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch menu items" });
   }
 });
 
@@ -17,10 +19,12 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const item = await menuItemModel.createMenuItem(req.body);
-    res.status(201).json(item);
+    res.status(201).json({ success: true, data: item });
   } catch (error) {
     console.error("Error creating menu item:", error);
-    res.status(500).json({ error: "Failed to create menu item" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to create menu item" });
   }
 });
 
@@ -29,12 +33,16 @@ router.put("/:id", async (req, res) => {
   try {
     const item = await menuItemModel.updateMenuItem(req.params.id, req.body);
     if (!item) {
-      return res.status(404).json({ error: "Menu item not found" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Menu item not found" });
     }
-    res.json(item);
+    res.json({ success: true, data: item });
   } catch (error) {
     console.error("Error updating menu item:", error);
-    res.status(500).json({ error: "Failed to update menu item" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to update menu item" });
   }
 });
 
@@ -43,12 +51,16 @@ router.get("/:id", async (req, res) => {
   try {
     const item = await menuItemModel.getMenuItemById(req.params.id);
     if (!item) {
-      return res.status(404).json({ error: "Menu item not found" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Menu item not found" });
     }
-    res.json(item);
+    res.json({ success: true, data: item });
   } catch (error) {
     console.error("Error fetching menu item:", error);
-    res.status(500).json({ error: "Failed to fetch menu item" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch menu item" });
   }
 });
 

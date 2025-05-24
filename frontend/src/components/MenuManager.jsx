@@ -184,6 +184,7 @@ const MenuManager = () => {
                     <IconButton
                       onClick={() => handleOpenDialog(item)}
                       size="small"
+                      data-testid="edit-button"
                     >
                       <EditIcon />
                     </IconButton>
@@ -191,6 +192,7 @@ const MenuManager = () => {
                       onClick={() => handleDelete(item.id)}
                       size="small"
                       color="error"
+                      data-testid="delete-button"
                     >
                       <DeleteIcon />
                     </IconButton>

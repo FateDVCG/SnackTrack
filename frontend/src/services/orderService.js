@@ -1,15 +1,14 @@
 // Order service for making API calls to the backend
+import axios from "axios";
+
+const API_BASE_URL = "http://localhost:3000/api";
 
 export const orderService = {
   // Get all orders
   async getOrders() {
     try {
-      const response = await fetch("/api/orders");
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to fetch orders");
-      }
-      return await response.json();
+      const response = await axios.get(`${API_BASE_URL}/orders`);
+      return response.data;
     } catch (error) {
       console.error("Error fetching orders:", error);
       throw error;
@@ -19,20 +18,13 @@ export const orderService = {
   // Update order status
   async updateOrderStatus(orderId, newStatus) {
     try {
-      const response = await fetch(`/api/orders/${orderId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update order status");
-      }
-
-      return await response.json();
+      const response = await axios.put(
+        `${API_BASE_URL}/orders/${orderId}/status`,
+        {
+          status: newStatus,
+        }
+      );
+      return response.data;
     } catch (error) {
       console.error("Error updating order status:", error);
       throw error;
@@ -52,20 +44,8 @@ export const orderService = {
         specialInstructions: orderData.specialInstructions,
       };
 
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create order");
-      }
-
-      return await response.json();
+      const response = await axios.post(`${API_BASE_URL}/orders`, data);
+      return response.data;
     } catch (error) {
       console.error("Error creating order:", error);
       throw error;

@@ -15,15 +15,17 @@ router.get("/", async (req, res) => {
     // Validate range parameter
     if (!["day", "week", "month"].includes(range)) {
       return res.status(400).json({
+        success: false,
         error: "Invalid range parameter. Use day, week, or month.",
       });
     }
 
     const analytics = await analyticsController.getAnalytics(range);
-    res.json(analytics);
+    res.json(analytics); // Fixed: Return the analytics directly without extra nesting
   } catch (error) {
     console.error("Analytics route error:", error);
     res.status(500).json({
+      success: false,
       error: "Failed to fetch analytics data",
       details: error.message,
     });

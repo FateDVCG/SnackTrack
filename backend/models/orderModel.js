@@ -15,6 +15,22 @@ const pool = new Pool({
  * @returns {Promise<Object>} Created order
  */
 async function createOrder(orderData) {
+  // Defensive checks for required fields
+  if (
+    !orderData ||
+    !orderData.items ||
+    !Array.isArray(orderData.items) ||
+    orderData.items.length === 0
+  ) {
+    throw new Error("Order must contain at least one item");
+  }
+  if (!orderData.status) {
+    throw new Error("Order status is required");
+  }
+  if (orderData.totalPrice == null || isNaN(orderData.totalPrice)) {
+    throw new Error("Order totalPrice is required and must be a number");
+  }
+
   const {
     customerId,
     customerName,
@@ -112,11 +128,42 @@ async function getOrders(filters = {}) {
  * @returns {Promise<Object>} Updated order
  */
 async function updateOrderStatus(orderId, status) {
+  if (!orderId || isNaN(Number(orderId))) {
+    throw new Error("Order ID must be a valid number");
+  }
   // Validate status
   const validStatuses = ["new", "accepted", "finished", "completed", "voided"];
   if (!validStatuses.includes(status)) {
     throw new Error(
       `Invalid status: ${status}. Must be one of: ${validStatuses.join(", ")}`
+    );
+  }
+
+  // Get current order to validate status transition
+  const currentOrder = await getOrderById(orderId);
+  if (!currentOrder) {
+    throw new Error(`Order with ID ${orderId} not found`);
+  }
+
+  // Define valid status transitions
+  const validTransitions = {
+    new: ["accepted", "voided"],
+    accepted: ["finished", "voided"],
+    finished: ["completed", "voided"],
+    completed: [], // Terminal state, no further transitions
+    voided: [], // Terminal state, no further transitions
+    // For backward compatibility with tests that use "pending" status
+    pending: ["accepted", "voided"],
+  };
+
+  // Check if the transition is valid
+  if (
+    currentOrder.status &&
+    validTransitions[currentOrder.status] &&
+    !validTransitions[currentOrder.status].includes(status)
+  ) {
+    throw new Error(
+      `Invalid status transition: Cannot change from ${currentOrder.status} to ${status}`
     );
   }
 
@@ -128,6 +175,11 @@ async function updateOrderStatus(orderId, status) {
   `;
 
   const { rows } = await pool.query(query, [status, orderId]);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
   return rows[0];
 }
 
@@ -137,10 +189,16 @@ async function updateOrderStatus(orderId, status) {
  * @returns {Promise<Object>} Order object
  */
 async function getOrderById(orderId) {
+  if (!orderId || isNaN(Number(orderId))) {
+    throw new Error("Order ID must be a valid number");
+  }
   const query = "SELECT * FROM orders WHERE id = $1";
   const { rows } = await pool.query(query, [orderId]);
   return rows[0];
 }
+
+// NOTE: Ensure you have run the migration 004_add_customer_name.sql on your real database.
+// NOTE: Ensure your DATABASE_URL environment variable is set and includes a password.
 
 module.exports = {
   createOrder,

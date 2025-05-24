@@ -47,14 +47,17 @@ async function getAnalytics(range) {
     const ordersByType = orderTypeData.map((type) => ({
       type: type.type,
       count: parseInt(type.count) || 0,
-      byTime: type.by_time.map((timePoint) => ({
-        date: formatTimeLabel(parseInt(timePoint.time_unit), range),
-        count: parseInt(timePoint.count) || 0,
-      })),
+      byTime: Array.isArray(type.by_time)
+        ? type.by_time.map((timePoint) => ({
+            date: formatTimeLabel(parseInt(timePoint.time_unit), range),
+            count: parseInt(timePoint.count) || 0,
+          }))
+        : [], // Return empty array if by_time is not an array
     }));
 
-    // Combine all data into a single response
+    // Combine all data into a single response with the correct structure for tests
     return {
+      success: true,
       data: {
         sales: {
           totalOrders: parseInt(salesData.total_orders) || 0,

@@ -1,13 +1,5 @@
 const { Pool } = require("pg");
-
-// Create a new pool using the connection string
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-    require: true,
-  },
-});
+const pool = require("../config/db");
 
 /**
  * Gets sales analytics for a specific time range

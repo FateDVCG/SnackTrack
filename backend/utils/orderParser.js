@@ -113,6 +113,63 @@ const QUANTITY_INDICATORS = {
 };
 
 /**
+ * Special instruction indicators
+ */
+const SPECIAL_INSTRUCTION_INDICATORS = {
+  english: ["with", "no", "extra", "without", "add", "less", "more"],
+  tagalog: ["na may", "walang", "dagdagan", "kulangan", "dagdag", "konti"],
+};
+
+/**
+ * Pickup order indicators
+ */
+const PICKUP_INDICATORS = {
+  english: [
+    "pick up",
+    "pickup",
+    "collect",
+    "will get",
+    "i'll get",
+    "i will get",
+  ],
+  tagalog: ["kunin", "susunduin", "kukunin", "pipick up", "kukuha"],
+};
+
+/**
+ * Time indicators
+ */
+const TIME_INDICATORS = {
+  english: ["at", "by", "around", "before", "after"],
+  tagalog: ["alas", "mga", "bago", "pagkatapos", "sa"],
+};
+
+/**
+ * Payment method indicators
+ */
+const PAYMENT_METHODS = {
+  english: {
+    cash: ["cash", "money", "pay with cash", "in cash"],
+    card: ["card", "credit card", "debit card", "visa", "mastercard"],
+    gcash: ["gcash", "g-cash", "g cash"],
+    paymaya: ["paymaya", "pay maya", "maya"],
+  },
+  tagalog: {
+    cash: ["cash", "pera", "bayad", "bayaran"],
+    card: ["card", "credit card", "debit card"],
+    gcash: ["gcash", "g-cash", "g cash"],
+    paymaya: ["paymaya", "pay maya", "maya"],
+  },
+};
+
+/**
+ * Discount code indicators
+ */
+const DISCOUNT_INDICATORS = {
+  english: ["discount", "code", "promo", "coupon", "voucher"],
+  tagalog: ["discount", "code", "promo", "kupon", "voucher"],
+};
+
+/**
  * Compound phrases to preserve
  */
 const COMPOUND_PHRASES = [
@@ -137,30 +194,214 @@ async function parseOrderText(text) {
     // Split remaining text into potential order and address parts
     const { orderText, address } = extractAddress(remainingText || text);
 
+    // Determine if this is a pickup order
+    const { isPickup, cleanedText } = checkForPickup(orderText);
+
+    // Extract special instructions
+    const { instructions, textWithoutInstructions } =
+      extractSpecialInstructions(cleanedText);
+
+    // Extract requested time
+    const { requestedTime, textWithoutTime } = extractRequestedTime(
+      textWithoutInstructions
+    );
+
+    // Extract payment method
+    const { paymentMethod, textWithoutPayment } =
+      extractPaymentMethod(textWithoutTime);
+
+    // Extract discount code
+    const { discountCode, finalText } = extractDiscountCode(textWithoutPayment);
+
     // Clean and tokenize the order text
-    const tokens = cleanText(orderText);
+    const tokens = cleanText(finalText);
 
     // Find quantities and menu items in the text
     const items = await findMenuItemsWithQuantities(tokens);
 
+    // Check for errors
+    const errors = validateOrder(items, text);
+
     return {
       items,
-      address,
+      deliveryAddress: address,
       customerName,
       customerPhone,
       originalText: text,
+      orderType: isPickup ? "pickup" : "delivery",
+      specialInstructions: instructions,
+      requestedTime,
+      paymentMethod,
+      discountCode,
+      errors: errors || [],
     };
   } catch (error) {
     console.error("Error parsing order text:", error);
     // Return a basic structure even if parsing fails
     return {
       items: [],
-      address: "",
+      deliveryAddress: null,
       customerName: null,
       customerPhone: null,
       originalText: text,
+      orderType: "delivery",
+      specialInstructions: null,
+      requestedTime: null,
+      paymentMethod: null,
+      discountCode: null,
+      errors: ["Failed to parse order text"],
     };
   }
+}
+
+/**
+ * Validate the order and return any errors
+ */
+function validateOrder(items, text) {
+  const errors = [];
+
+  // Check for zero quantity items
+  if (text.match(/\b0\s+\w+/i)) {
+    errors.push("Order contains items with zero quantity");
+  }
+
+  // Check if no items were found
+  if (items.length === 0) {
+    // Try to identify what might have been ordered but not found
+    const words = text.toLowerCase().split(/\s+/);
+    const potentialItems = words.filter(
+      (word) =>
+        !FILTER_WORDS.english.includes(word) &&
+        !FILTER_WORDS.tagalog.includes(word) &&
+        word.length > 3
+    );
+
+    if (potentialItems.length > 0) {
+      errors.push(`Unknown menu items: ${potentialItems.join(", ")}`);
+    } else {
+      errors.push("No menu items found in order");
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Check if this is a pickup order
+ */
+function checkForPickup(text) {
+  const lowerText = text.toLowerCase();
+
+  for (const lang of ["english", "tagalog"]) {
+    for (const indicator of PICKUP_INDICATORS[lang]) {
+      if (lowerText.includes(indicator.toLowerCase())) {
+        return {
+          isPickup: true,
+          cleanedText: lowerText.replace(new RegExp(indicator, "gi"), ""),
+        };
+      }
+    }
+  }
+
+  return { isPickup: false, cleanedText: text };
+}
+
+/**
+ * Extract special instructions from text
+ */
+function extractSpecialInstructions(text) {
+  const instructions = [];
+  let textWithoutInstructions = text;
+
+  for (const lang of ["english", "tagalog"]) {
+    for (const indicator of SPECIAL_INSTRUCTION_INDICATORS[lang]) {
+      const regex = new RegExp(`${indicator}\\s+([\\w\\s]+)`, "gi");
+      const matches = text.matchAll(regex);
+
+      for (const match of matches) {
+        if (match[1]) {
+          instructions.push(match[0].trim());
+          textWithoutInstructions = textWithoutInstructions.replace(
+            match[0],
+            ""
+          );
+        }
+      }
+    }
+  }
+
+  return {
+    instructions: instructions.length > 0 ? instructions.join(", ") : null,
+    textWithoutInstructions,
+  };
+}
+
+/**
+ * Extract requested time from text
+ */
+function extractRequestedTime(text) {
+  const timeRegex =
+    /\b(at|by|around|before|after|alas|mga)\s+([0-9]{1,2}[:.][0-9]{2}(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?)\b/i;
+  const match = text.match(timeRegex);
+
+  if (match) {
+    return {
+      requestedTime: match[2].trim(),
+      textWithoutTime: text.replace(match[0], ""),
+    };
+  }
+
+  return { requestedTime: null, textWithoutTime: text };
+}
+
+/**
+ * Extract payment method from text
+ */
+function extractPaymentMethod(text) {
+  const lowerText = text.toLowerCase();
+
+  for (const lang of ["english", "tagalog"]) {
+    for (const [method, indicators] of Object.entries(PAYMENT_METHODS[lang])) {
+      for (const indicator of indicators) {
+        if (lowerText.includes(indicator.toLowerCase())) {
+          return {
+            paymentMethod: method,
+            textWithoutPayment: lowerText.replace(
+              new RegExp(indicator, "gi"),
+              ""
+            ),
+          };
+        }
+      }
+    }
+  }
+
+  return { paymentMethod: null, textWithoutPayment: text };
+}
+
+/**
+ * Extract discount code from text
+ */
+function extractDiscountCode(text) {
+  let discountCode = null;
+  let finalText = text;
+
+  // Look for patterns like "discount code: ABC123" or "promo: SAVE50"
+  for (const lang of ["english", "tagalog"]) {
+    for (const indicator of DISCOUNT_INDICATORS[lang]) {
+      const regex = new RegExp(`${indicator}(?:\\s*:?\\s*)([A-Za-z0-9]+)`, "i");
+      const match = text.match(regex);
+
+      if (match && match[1]) {
+        discountCode = match[1].toUpperCase();
+        finalText = finalText.replace(match[0], "");
+        break;
+      }
+    }
+    if (discountCode) break;
+  }
+
+  return { discountCode, finalText };
 }
 
 /**
@@ -279,7 +520,7 @@ function extractAddress(text) {
   }
 
   // If no address found, return original text as order
-  return { orderText: text, address: "" };
+  return { orderText: text, address: null };
 }
 
 /**

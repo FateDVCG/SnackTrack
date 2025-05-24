@@ -47,6 +47,18 @@ router.post("/", async (req, res) => {
   try {
     const body = req.body;
 
+    // Validate that the request is a proper Messenger webhook event
+    if (
+      !body ||
+      !body.object ||
+      body.object !== "page" ||
+      !body.entry ||
+      !Array.isArray(body.entry)
+    ) {
+      console.error("Invalid webhook payload:", body);
+      return res.status(400).send("INVALID_PAYLOAD");
+    }
+
     // Process the message through our controller
     const parsedMessages = messengerController.processWebhook(body);
 

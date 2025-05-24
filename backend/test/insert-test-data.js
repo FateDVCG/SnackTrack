@@ -120,7 +120,8 @@ async function insertTestOrders() {
     console.error("Error inserting test data:", error);
   } finally {
     client.release();
-    await pool.end();
+    // Do not close the pool here to avoid breaking other tests
+    // await pool.end();
   }
 }
 

@@ -49,6 +49,13 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/menu-items", menuItemsRoutes);
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+// Only start the server if this file is run directly
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
+
+console.log("Loaded DATABASE_URL:", process.env.DATABASE_URL);
+
+module.exports = app;
