@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo, useCallback } from "react";
 import {
   Container,
   Typography,
@@ -19,12 +19,8 @@ import { CurrencyContext } from "../App";
 import AddIcon from "@mui/icons-material/Add";
 
 const Dashboard = () => {
-  // State for orders
-  const [newOrders, setNewOrders] = useState([]);
-  const [acceptedOrders, setAcceptedOrders] = useState([]);
-  const [finishedOrders, setFinishedOrders] = useState([]);
-  const [completedOrders, setCompletedOrders] = useState([]);
-  const [voidedOrders, setVoidedOrders] = useState([]);
+  // State for all orders
+  const [orders, setOrders] = useState([]);
 
   // State for filters
   const [orderTypeFilter, setOrderTypeFilter] = useState("all");
@@ -44,126 +40,94 @@ const Dashboard = () => {
 
   const { currency } = useContext(CurrencyContext);
 
+  // Fetch orders on mount and poll
   useEffect(() => {
     fetchOrders();
-    // Set up polling for new orders
-    const interval = setInterval(fetchOrders, 30000); // Poll every 30 seconds
+    const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       const response = await orderService.getOrders();
-      // Support both array and wrapped object response
-      const orders = Array.isArray(response) ? response : response.data;
-
-      // Sort orders by status
-      setNewOrders(orders.filter((order) => order.status === "new"));
-      setAcceptedOrders(orders.filter((order) => order.status === "accepted"));
-      setFinishedOrders(orders.filter((order) => order.status === "finished"));
-      setCompletedOrders(
-        orders.filter((order) => order.status === "completed")
-      );
-      setVoidedOrders(orders.filter((order) => order.status === "voided"));
-
+      const fetchedOrders = Array.isArray(response) ? response : response.data;
+      setOrders(fetchedOrders);
       setLoading(false);
     } catch (err) {
-      console.error("Error fetching orders:", err);
       setError("Failed to fetch orders");
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleOrderUpdate = (updatedOrder) => {
-    // Remove order from its current status list
-    setNewOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
-    setAcceptedOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
-    setFinishedOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
-    setCompletedOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
-    setVoidedOrders((prev) => prev.filter((o) => o.id !== updatedOrder.id));
+  // Memoized filtered lists
+  const newOrders = useMemo(() => orders.filter((o) => o.status === "new"), [orders]);
+  const acceptedOrders = useMemo(() => orders.filter((o) => o.status === "accepted"), [orders]);
+  const finishedOrders = useMemo(() => orders.filter((o) => o.status === "finished"), [orders]);
+  const completedOrders = useMemo(() => orders.filter((o) => o.status === "completed"), [orders]);
+  const voidedOrders = useMemo(() => orders.filter((o) => o.status === "voided"), [orders]);
 
-    // Add order to its new status list
-    switch (updatedOrder.status) {
-      case "accepted":
-        setAcceptedOrders((prev) => [...prev, updatedOrder]);
-        break;
-      case "finished":
-        setFinishedOrders((prev) => [...prev, updatedOrder]);
-        break;
-      case "completed":
-        setCompletedOrders((prev) => [...prev, updatedOrder]);
-        break;
-      case "voided":
-        setVoidedOrders((prev) => [...prev, updatedOrder]);
-        break;
-      default:
-        break;
-    }
-  };
+  const filteredNewOrders = useMemo(() =>
+    newOrders.filter(
+      (order) =>
+        orderTypeFilter === "all" ||
+        order.order_type?.toLowerCase() === orderTypeFilter.toLowerCase()
+    ),
+    [newOrders, orderTypeFilter]
+  );
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  // Memoized callbacks
+  const handleOrderUpdate = useCallback((updatedOrder) => {
+    setOrders((prevOrders) => {
+      // Remove old order and add updated one
+      const filtered = prevOrders.filter((o) => o.id !== updatedOrder.id);
+      return [...filtered, updatedOrder];
+    });
+  }, []);
+
+  const handleStatusChange = useCallback(async (orderId, newStatus) => {
     try {
-      const updatedOrder = await orderService.updateOrderStatus(
-        orderId,
-        newStatus
-      );
+      const updatedOrder = await orderService.updateOrderStatus(orderId, newStatus);
       handleOrderUpdate(updatedOrder);
       showSnackbar(`Order ${newStatus} successfully`, "success");
     } catch (err) {
-      console.error("Error updating order status:", err);
       showSnackbar("Failed to update order status", "error");
     }
-  };
+  }, [handleOrderUpdate]);
 
-  const handleAcceptOrder = async (orderId) => {
+  const handleAcceptOrder = useCallback(async (orderId) => {
     try {
-      const updatedOrder = await orderService.updateOrderStatus(
-        orderId,
-        "accepted"
-      );
+      const updatedOrder = await orderService.updateOrderStatus(orderId, "accepted");
       handleOrderUpdate(updatedOrder);
       showSnackbar("Order accepted successfully", "success");
     } catch (err) {
-      console.error("Error accepting order:", err);
       showSnackbar("Failed to accept order", "error");
     }
-  };
+  }, [handleOrderUpdate]);
 
-  const handleVoidOrder = async (orderId) => {
+  const handleVoidOrder = useCallback(async (orderId) => {
     try {
-      const updatedOrder = await orderService.updateOrderStatus(
-        orderId,
-        "voided"
-      );
+      const updatedOrder = await orderService.updateOrderStatus(orderId, "voided");
       handleOrderUpdate(updatedOrder);
       showSnackbar("Order voided successfully", "success");
     } catch (err) {
-      console.error("Error voiding order:", err);
       showSnackbar("Failed to void order", "error");
     }
-  };
+  }, [handleOrderUpdate]);
 
-  const handleManualOrderSubmit = async (orderData) => {
+  const handleManualOrderSubmit = useCallback(async (orderData) => {
     try {
       const newOrder = await orderService.createOrder(orderData);
-      setNewOrders((prev) => [...prev, newOrder]);
+      setOrders((prev) => [...prev, newOrder]);
       setManualEntryOpen(false);
       showSnackbar("Order created successfully", "success");
     } catch (err) {
-      console.error("Error creating order:", err);
       showSnackbar("Failed to create order", "error");
     }
-  };
+  }, []);
 
   const showSnackbar = (message, severity = "info") => {
     setSnackbar({ open: true, message, severity });
   };
-
-  const filteredNewOrders = newOrders.filter(
-    (order) =>
-      orderTypeFilter === "all" ||
-      order.order_type?.toLowerCase() === orderTypeFilter.toLowerCase()
-  );
 
   if (loading) {
     return (

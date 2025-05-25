@@ -46,18 +46,20 @@ const MenuManager = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log("Fetching menu items...");
       const items = await menuService.getMenuItems();
-      console.log("Received menu items:", items);
-      // Ensure prices are numbers
-      const formattedItems = items.map((item) => ({
+      // Support both array and object with data property
+      const dataArray = Array.isArray(items)
+        ? items
+        : Array.isArray(items?.data)
+        ? items.data
+        : [];
+      const formattedItems = dataArray.map((item) => ({
         ...item,
         price:
           typeof item.price === "string" ? parseFloat(item.price) : item.price,
       }));
       setMenuItems(formattedItems);
     } catch (error) {
-      console.error("Error fetching menu items:", error);
       setError("Failed to load menu items. Please try again.");
     } finally {
       setLoading(false);
