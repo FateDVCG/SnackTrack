@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useContext, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   Container,
   Typography,
@@ -60,18 +66,34 @@ const Dashboard = () => {
   }, []);
 
   // Memoized filtered lists
-  const newOrders = useMemo(() => orders.filter((o) => o.status === "new"), [orders]);
-  const acceptedOrders = useMemo(() => orders.filter((o) => o.status === "accepted"), [orders]);
-  const finishedOrders = useMemo(() => orders.filter((o) => o.status === "finished"), [orders]);
-  const completedOrders = useMemo(() => orders.filter((o) => o.status === "completed"), [orders]);
-  const voidedOrders = useMemo(() => orders.filter((o) => o.status === "voided"), [orders]);
+  const newOrders = useMemo(
+    () => orders.filter((o) => o.status === "new"),
+    [orders]
+  );
+  const acceptedOrders = useMemo(
+    () => orders.filter((o) => o.status === "accepted"),
+    [orders]
+  );
+  const finishedOrders = useMemo(
+    () => orders.filter((o) => o.status === "finished"),
+    [orders]
+  );
+  const completedOrders = useMemo(
+    () => orders.filter((o) => o.status === "completed"),
+    [orders]
+  );
+  const voidedOrders = useMemo(
+    () => orders.filter((o) => o.status === "voided"),
+    [orders]
+  );
 
-  const filteredNewOrders = useMemo(() =>
-    newOrders.filter(
-      (order) =>
-        orderTypeFilter === "all" ||
-        order.order_type?.toLowerCase() === orderTypeFilter.toLowerCase()
-    ),
+  const filteredNewOrders = useMemo(
+    () =>
+      newOrders.filter(
+        (order) =>
+          orderTypeFilter === "all" ||
+          order.order_type?.toLowerCase() === orderTypeFilter.toLowerCase()
+      ),
     [newOrders, orderTypeFilter]
   );
 
@@ -88,61 +110,73 @@ const Dashboard = () => {
   }, []);
 
   // Optimistic status change
-  const handleStatusChange = useCallback(async (orderId, newStatus) => {
-    // Save previous state for rollback
-    setPrevOrders(orders);
-    // Optimistically update UI
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === orderId ? { ...o, status: newStatus } : o
-      )
-    );
-    try {
-      const updatedOrder = await orderService.updateOrderStatus(orderId, newStatus);
-      handleOrderUpdate(updatedOrder);
-      showSnackbar(`Order ${newStatus} successfully`, "success");
-    } catch (err) {
-      // Rollback
-      setOrders(prevOrders);
-      showSnackbar("Failed to update order status", "error");
-    }
-  }, [orders, handleOrderUpdate, prevOrders]);
+  const handleStatusChange = useCallback(
+    async (orderId, newStatus) => {
+      // Save previous state for rollback
+      setPrevOrders(orders);
+      // Optimistically update UI
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      );
+      try {
+        const updatedOrder = await orderService.updateOrderStatus(
+          orderId,
+          newStatus
+        );
+        handleOrderUpdate(updatedOrder);
+        showSnackbar(`Order ${newStatus} successfully`, "success");
+      } catch (err) {
+        // Rollback
+        setOrders(prevOrders);
+        showSnackbar("Failed to update order status", "error");
+      }
+    },
+    [orders, handleOrderUpdate, prevOrders]
+  );
 
   // Optimistic accept order
-  const handleAcceptOrder = useCallback(async (orderId) => {
-    setPrevOrders(orders);
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === orderId ? { ...o, status: "accepted" } : o
-      )
-    );
-    try {
-      const updatedOrder = await orderService.updateOrderStatus(orderId, "accepted");
-      handleOrderUpdate(updatedOrder);
-      showSnackbar("Order accepted successfully", "success");
-    } catch (err) {
-      setOrders(prevOrders);
-      showSnackbar("Failed to accept order", "error");
-    }
-  }, [orders, handleOrderUpdate, prevOrders]);
+  const handleAcceptOrder = useCallback(
+    async (orderId) => {
+      setPrevOrders(orders);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: "accepted" } : o))
+      );
+      try {
+        const updatedOrder = await orderService.updateOrderStatus(
+          orderId,
+          "accepted"
+        );
+        handleOrderUpdate(updatedOrder);
+        showSnackbar("Order accepted successfully", "success");
+      } catch (err) {
+        setOrders(prevOrders);
+        showSnackbar("Failed to accept order", "error");
+      }
+    },
+    [orders, handleOrderUpdate, prevOrders]
+  );
 
   // Optimistic void order
-  const handleVoidOrder = useCallback(async (orderId) => {
-    setPrevOrders(orders);
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === orderId ? { ...o, status: "voided" } : o
-      )
-    );
-    try {
-      const updatedOrder = await orderService.updateOrderStatus(orderId, "voided");
-      handleOrderUpdate(updatedOrder);
-      showSnackbar("Order voided successfully", "success");
-    } catch (err) {
-      setOrders(prevOrders);
-      showSnackbar("Failed to void order", "error");
-    }
-  }, [orders, handleOrderUpdate, prevOrders]);
+  const handleVoidOrder = useCallback(
+    async (orderId) => {
+      setPrevOrders(orders);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: "voided" } : o))
+      );
+      try {
+        const updatedOrder = await orderService.updateOrderStatus(
+          orderId,
+          "voided"
+        );
+        handleOrderUpdate(updatedOrder);
+        showSnackbar("Order voided successfully", "success");
+      } catch (err) {
+        setOrders(prevOrders);
+        showSnackbar("Failed to void order", "error");
+      }
+    },
+    [orders, handleOrderUpdate, prevOrders]
+  );
 
   const handleManualOrderSubmit = useCallback(async (orderData) => {
     try {
