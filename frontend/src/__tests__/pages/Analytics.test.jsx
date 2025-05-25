@@ -4,8 +4,9 @@ import { ThemeProvider } from "@mui/material";
 import { createTheme } from "@mui/material/styles";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { analyticsService } from "../../services/analyticsService";
-import Analytics from "../Analytics";
+import Analytics from "../../pages/Analytics";
 import { CurrencyContext } from "../../App";
+import userEvent from "@testing-library/user-event";
 
 vi.mock("../../services/analyticsService", () => ({
   analyticsService: {

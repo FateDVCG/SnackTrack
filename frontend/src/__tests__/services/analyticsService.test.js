@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { analyticsService } from "../analyticsService";
+import { analyticsService } from "../../services/analyticsService";
 import axios from "axios";
 
 vi.mock("axios");

@@ -1,9 +1,9 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "../../../src/setupTests";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { menuService } from "../../services/menuService";
-import MenuManager from "../MenuManager";
+import MenuManager from "../../components/MenuManager";
 
 vi.mock("../../services/menuService");
 

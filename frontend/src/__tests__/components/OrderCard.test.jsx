@@ -1,10 +1,10 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi } from "vitest";
-import OrderCard from "../OrderCard";
+import OrderCard from "../../components/OrderCard";
 import { CurrencyContext } from "../../App";
 import { ThemeProvider, createTheme } from "@mui/material";
-import { mockCurrencyContext } from "../../setupTests";
+import { mockCurrencyContext } from "../../setupTests.js";
 
 const theme = createTheme({
   palette: {

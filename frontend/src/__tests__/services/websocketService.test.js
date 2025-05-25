@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import WebSocketService from "../websocketService";
+import { WebSocketService } from "../../services/websocketService";
 
 describe("WebSocketService", () => {
   let websocketService;
