@@ -68,6 +68,38 @@ export const analyticsService = {
     throw lastError;
   },
 
+  /**
+   * Fetch analytics for a custom date range
+   * @param {string} startDate - ISO string (YYYY-MM-DD)
+   * @param {string} endDate - ISO string (YYYY-MM-DD)
+   * @param {boolean} forceRefresh
+   */
+  async getAnalyticsByDateRange(startDate, endDate, forceRefresh = false) {
+    const cacheKey = `analytics_custom_${startDate}_${endDate}`;
+    if (!forceRefresh) {
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) return cachedData;
+    }
+    let lastError;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/analytics`, {
+          params: { startDate, endDate },
+        });
+        const data = response.data;
+        cache.set(cacheKey, data);
+        return data;
+      } catch (error) {
+        lastError = error;
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          continue;
+        }
+      }
+    }
+    throw lastError;
+  },
+
   clearCache() {
     cache.clear();
   },

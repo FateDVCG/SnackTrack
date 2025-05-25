@@ -3,23 +3,32 @@ const pool = require("../config/db");
 
 /**
  * Gets sales analytics for a specific time range
- * @param {string} range - 'day', 'week', or 'month'
+ * @param {Object} params - Parameters object
+ * @param {string} params.range - 'day', 'week', or 'month'
+ * @param {string} [params.startDate] - Optional start date in YYYY-MM-DD format
+ * @param {string} [params.endDate] - Optional end date in YYYY-MM-DD format
  * @returns {Promise<Object>} Analytics data
  */
-async function getSalesAnalytics(range) {
-  let intervalQuery;
-  switch (range) {
-    case "day":
-      intervalQuery = "created_at >= CURRENT_DATE";
-      break;
-    case "week":
-      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
-      break;
-    case "month":
-      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
-      break;
-    default:
-      throw new Error("Invalid range specified. Use day, week, or month.");
+async function getSalesAnalytics({ range, startDate, endDate }) {
+  let intervalQuery = "";
+  let values = [];
+  if (startDate && endDate) {
+    intervalQuery = "created_at BETWEEN $1 AND $2";
+    values = [startDate, endDate];
+  } else {
+    switch (range) {
+      case "day":
+        intervalQuery = "created_at >= CURRENT_DATE";
+        break;
+      case "week":
+        intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
+        break;
+      case "month":
+        intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
+        break;
+      default:
+        throw new Error("Invalid range specified. Use day, week, or month, or provide startDate and endDate.");
+    }
   }
 
   const query = `
@@ -34,7 +43,7 @@ async function getSalesAnalytics(range) {
   `;
 
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, values);
     return result.rows[0];
   } catch (error) {
     console.error("Error getting sales analytics:", error);
@@ -48,20 +57,26 @@ async function getSalesAnalytics(range) {
  * @param {number} limit - Number of items to return
  * @returns {Promise<Array>} Top selling items
  */
-async function getTopSellingItems(range, limit = 5) {
-  let intervalQuery;
-  switch (range) {
-    case "day":
-      intervalQuery = "created_at >= CURRENT_DATE";
-      break;
-    case "week":
-      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
-      break;
-    case "month":
-      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
-      break;
-    default:
-      throw new Error("Invalid range specified. Use day, week, or month.");
+async function getTopSellingItems({ range, startDate, endDate, limit = 5 }) {
+  let intervalQuery = "";
+  let values = [];
+  if (startDate && endDate) {
+    intervalQuery = "created_at BETWEEN $1 AND $2";
+    values = [startDate, endDate];
+  } else {
+    switch (range) {
+      case "day":
+        intervalQuery = "created_at >= CURRENT_DATE";
+        break;
+      case "week":
+        intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
+        break;
+      case "month":
+        intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
+        break;
+      default:
+        throw new Error("Invalid range specified. Use day, week, or month, or provide startDate and endDate.");
+    }
   }
 
   // This query assumes items are stored as a JSONB array in the orders table
@@ -80,11 +95,11 @@ async function getTopSellingItems(range, limit = 5) {
     FROM items
     GROUP BY item_name
     ORDER BY quantity_sold DESC
-    LIMIT $1
+    LIMIT $${values.length + 1}
   `;
 
   try {
-    const result = await pool.query(query, [limit]);
+    const result = await pool.query(query, [...values, limit]);
     return result.rows;
   } catch (error) {
     console.error("Error getting top selling items:", error);
@@ -137,23 +152,32 @@ async function getHourlyDistribution(range) {
  * @param {string} range - 'day', 'week', or 'month'
  * @returns {Promise<Array>} Revenue time series data
  */
-async function getRevenueOverTime(range) {
-  let timeGroup, intervalQuery;
-  switch (range) {
-    case "day":
-      timeGroup = "EXTRACT(HOUR FROM created_at)";
-      intervalQuery = "created_at >= CURRENT_DATE";
-      break;
-    case "week":
-      timeGroup = "EXTRACT(DOW FROM created_at)";
-      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
-      break;
-    case "month":
-      timeGroup = "EXTRACT(DAY FROM created_at)";
-      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
-      break;
-    default:
-      throw new Error("Invalid range specified");
+// Accepts params: { range, startDate, endDate }
+async function getRevenueOverTime({ range, startDate, endDate }) {
+  let timeGroup = "";
+  let intervalQuery = "";
+  let values = [];
+  if (startDate && endDate) {
+    timeGroup = "DATE_TRUNC('day', created_at)";
+    intervalQuery = "created_at BETWEEN $1 AND $2";
+    values = [startDate, endDate];
+  } else {
+    switch (range) {
+      case "day":
+        timeGroup = "EXTRACT(HOUR FROM created_at)";
+        intervalQuery = "created_at >= CURRENT_DATE";
+        break;
+      case "week":
+        timeGroup = "EXTRACT(DOW FROM created_at)";
+        intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
+        break;
+      case "month":
+        timeGroup = "EXTRACT(DAY FROM created_at)";
+        intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
+        break;
+      default:
+        throw new Error("Invalid range specified");
+    }
   }
 
   const query = `
@@ -169,7 +193,7 @@ async function getRevenueOverTime(range) {
   `;
 
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, values);
     return result.rows;
   } catch (error) {
     console.error("Error getting revenue over time:", error);
@@ -179,26 +203,37 @@ async function getRevenueOverTime(range) {
 
 /**
  * Gets orders by type with time distribution
- * @param {string} range - 'day', 'week', or 'month'
+ * @param {Object} params - { range, startDate, endDate }
  * @returns {Promise<Array>} Orders by type data
  */
-async function getOrdersByType(range) {
-  let timeGroup, intervalQuery;
-  switch (range) {
-    case "day":
-      timeGroup = "EXTRACT(HOUR FROM created_at)";
-      intervalQuery = "created_at >= CURRENT_DATE";
-      break;
-    case "week":
-      timeGroup = "EXTRACT(DOW FROM created_at)";
-      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
-      break;
-    case "month":
-      timeGroup = "EXTRACT(DAY FROM created_at)";
-      intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
-      break;
-    default:
-      throw new Error("Invalid range specified");
+async function getOrdersByType({ range, startDate, endDate }) {
+  let timeGroup, intervalQuery, values = [];
+  // Default to 'month' if no valid range or dates are provided
+  if (!range && !(startDate && endDate)) {
+    range = 'month';
+  }
+  if (startDate && endDate) {
+    // Use TO_CHAR to ensure time_unit is always text for custom range
+    timeGroup = "TO_CHAR(DATE_TRUNC('day', created_at), 'YYYY-MM-DD')";
+    intervalQuery = "created_at BETWEEN $1 AND $2";
+    values = [startDate, endDate];
+  } else {
+    switch (range) {
+      case "day":
+        timeGroup = "EXTRACT(HOUR FROM created_at)::text";
+        intervalQuery = "created_at >= CURRENT_DATE";
+        break;
+      case "week":
+        timeGroup = "EXTRACT(DOW FROM created_at)::text";
+        intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
+        break;
+      case "month":
+        timeGroup = "EXTRACT(DAY FROM created_at)::text";
+        intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
+        break;
+      default:
+        throw new Error("Invalid range specified. Use day, week, or month, or provide startDate and endDate.");
+    }
   }
 
   const query = `
@@ -226,7 +261,7 @@ async function getOrdersByType(range) {
       t.total_count as count,
       json_agg(
         json_build_object(
-          'time_unit', COALESCE(ts.time_unit, 0),
+          'time_unit', COALESCE(ts.time_unit, '0'),
           'count', COALESCE(ts.count, 0)
         ) ORDER BY ts.time_unit
       ) as by_time
@@ -236,7 +271,7 @@ async function getOrdersByType(range) {
   `;
 
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(query, values);
     return result.rows;
   } catch (error) {
     console.error("Error getting orders by type:", error);

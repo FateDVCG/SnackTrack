@@ -1,6 +1,11 @@
 {
   "dependencies": {
+    "@mui/icons-material": "^7.1.0",
+    "@mui/lab": "^7.0.0-beta.12",
+    "@mui/x-date-pickers": "^8.4.0",
+    "date-fns": "^2.29.3",
     "express": "^5.1.0",
+    "react-datepicker": "^8.3.0",
     "recharts": "^2.15.3"
   }
 }

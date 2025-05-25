@@ -53,7 +53,9 @@ const Dashboard = () => {
 
   const fetchOrders = async () => {
     try {
-      const orders = await orderService.getOrders();
+      const response = await orderService.getOrders();
+      // Support both array and wrapped object response
+      const orders = Array.isArray(response) ? response : response.data;
 
       // Sort orders by status
       setNewOrders(orders.filter((order) => order.status === "new"));

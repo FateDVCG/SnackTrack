@@ -8,6 +8,8 @@ import {
   ToggleButton,
   LinearProgress,
   Paper,
+  Button,
+  TextField,
 } from "@mui/material";
 import { analyticsService } from "../services/analyticsService";
 import { CurrencyContext } from "../App";
@@ -24,6 +26,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format } from "date-fns";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 // Generate hourly data for today
 const generateHourlyData = () => {
@@ -137,11 +141,23 @@ const Analytics = () => {
     lastUpdated: null,
   });
   const { currency } = useContext(CurrencyContext);
+  const [customRangeMode, setCustomRangeMode] = useState(false);
+  const [dateRange, setDateRange] = useState([null, null]);
 
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const response = await analyticsService.getAnalytics(timeRange);
+      let response;
+      if (customRangeMode && dateRange[0] && dateRange[1]) {
+        const startDate = dateRange[0].toISOString().slice(0, 10);
+        const endDate = dateRange[1].toISOString().slice(0, 10);
+        response = await analyticsService.getAnalyticsByDateRange(
+          startDate,
+          endDate
+        );
+      } else {
+        response = await analyticsService.getAnalytics(timeRange);
+      }
 
       if (response?.data) {
         setAnalytics(response.data);
@@ -169,8 +185,13 @@ const Analytics = () => {
   };
 
   useEffect(() => {
-    fetchAnalytics();
-  }, [timeRange]);
+    if (customRangeMode) {
+      if (dateRange[0] && dateRange[1]) fetchAnalytics();
+    } else {
+      fetchAnalytics();
+    }
+    // eslint-disable-next-line
+  }, [timeRange, customRangeMode, dateRange]);
 
   const SummaryCards = () => (
     <>
@@ -418,23 +439,51 @@ const Analytics = () => {
           alignItems: "center",
         }}
       >
-        <ToggleButtonGroup
-          value={timeRange}
-          exclusive
-          onChange={(e, v) => v && setTimeRange(v)}
-          size="small"
-        >
-          <ToggleButton value="day">Today</ToggleButton>
-          <ToggleButton value="week">This Week</ToggleButton>
-          <ToggleButton value="month">This Month</ToggleButton>
-        </ToggleButtonGroup>
-
-        {/* Debug Info */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <ToggleButtonGroup
+            value={customRangeMode ? null : timeRange}
+            exclusive
+            onChange={(e, v) => {
+              if (v) {
+                setCustomRangeMode(false);
+                setTimeRange(v);
+              }
+            }}
+            size="small"
+            disabled={customRangeMode}
+          >
+            <ToggleButton value="day">Today</ToggleButton>
+            <ToggleButton value="week">This Week</ToggleButton>
+            <ToggleButton value="month">This Month</ToggleButton>
+          </ToggleButtonGroup>
+          <Button
+            variant={customRangeMode ? "contained" : "outlined"}
+            size="small"
+            onClick={() => setCustomRangeMode((v) => !v)}
+          >
+            Custom Range
+          </Button>
+        </Box>
         <Typography variant="caption" sx={{ color: "text.secondary" }}>
           Data Source: {debugInfo.source}
           {debugInfo.lastUpdated && ` • Last Updated: ${debugInfo.lastUpdated}`}
         </Typography>
       </Box>
+      {customRangeMode && (
+        <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 2 }}>
+          <DatePicker
+            selectsRange
+            startDate={dateRange[0]}
+            endDate={dateRange[1]}
+            onChange={(update) => setDateRange(update)}
+            maxDate={new Date()}
+            isClearable={true}
+            placeholderText="Select date range"
+            dateFormat="yyyy-MM-dd"
+            customInput={<TextField size="small" label="Date Range" />}
+          />
+        </Box>
+      )}
 
       {loading && <LinearProgress />}
 
