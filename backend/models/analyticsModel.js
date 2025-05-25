@@ -27,7 +27,9 @@ async function getSalesAnalytics({ range, startDate, endDate }) {
         intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
         break;
       default:
-        throw new Error("Invalid range specified. Use day, week, or month, or provide startDate and endDate.");
+        throw new Error(
+          "Invalid range specified. Use day, week, or month, or provide startDate and endDate."
+        );
     }
   }
 
@@ -75,7 +77,9 @@ async function getTopSellingItems({ range, startDate, endDate, limit = 5 }) {
         intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
         break;
       default:
-        throw new Error("Invalid range specified. Use day, week, or month, or provide startDate and endDate.");
+        throw new Error(
+          "Invalid range specified. Use day, week, or month, or provide startDate and endDate."
+        );
     }
   }
 
@@ -207,10 +211,12 @@ async function getRevenueOverTime({ range, startDate, endDate }) {
  * @returns {Promise<Array>} Orders by type data
  */
 async function getOrdersByType({ range, startDate, endDate }) {
-  let timeGroup, intervalQuery, values = [];
+  let timeGroup,
+    intervalQuery,
+    values = [];
   // Default to 'month' if no valid range or dates are provided
   if (!range && !(startDate && endDate)) {
-    range = 'month';
+    range = "month";
   }
   if (startDate && endDate) {
     // Use TO_CHAR to ensure time_unit is always text for custom range
@@ -232,7 +238,9 @@ async function getOrdersByType({ range, startDate, endDate }) {
         intervalQuery = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
         break;
       default:
-        throw new Error("Invalid range specified. Use day, week, or month, or provide startDate and endDate.");
+        throw new Error(
+          "Invalid range specified. Use day, week, or month, or provide startDate and endDate."
+        );
     }
   }
 

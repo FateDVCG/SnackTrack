@@ -92,7 +92,9 @@ export const analyticsService = {
       } catch (error) {
         lastError = error;
         if (attempt < MAX_RETRIES - 1) {
-          await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, attempt) * 1000)
+          );
           continue;
         }
       }

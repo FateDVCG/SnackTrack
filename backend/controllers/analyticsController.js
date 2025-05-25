@@ -28,15 +28,17 @@ async function getAnalytics({ range, startDate, endDate }) {
   try {
     // Pass custom dates to model if provided, else use range
     const modelParams = { range, startDate, endDate };
-    const [salesData, topItems, revenueData, orderTypeData] = await Promise.all([
-      analyticsModel.getSalesAnalytics(modelParams),
-      analyticsModel.getTopSellingItems(modelParams),
-      analyticsModel.getRevenueOverTime(modelParams),
-      analyticsModel.getOrdersByType(modelParams), // Pass the full params object
-    ]);
+    const [salesData, topItems, revenueData, orderTypeData] = await Promise.all(
+      [
+        analyticsModel.getSalesAnalytics(modelParams),
+        analyticsModel.getTopSellingItems(modelParams),
+        analyticsModel.getRevenueOverTime(modelParams),
+        analyticsModel.getOrdersByType(modelParams), // Pass the full params object
+      ]
+    );
 
     // Use range for formatting, fallback to 'custom' if not present
-    const formatRange = range || 'custom';
+    const formatRange = range || "custom";
     const formatTime = (unit) => formatTimeLabel(parseInt(unit), formatRange);
 
     // Format revenue over time data
@@ -69,7 +71,8 @@ async function getAnalytics({ range, startDate, endDate }) {
           cancelledOrders: parseInt(salesData.cancelled_orders) || 0,
           completionRate: salesData.total_orders
             ? (
-                (salesData.completed_orders / salesData.total_orders) * 100
+                (salesData.completed_orders / salesData.total_orders) *
+                100
               ).toFixed(2)
             : 0,
         },

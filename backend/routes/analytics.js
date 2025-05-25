@@ -21,7 +21,8 @@ router.get("/", async (req, res) => {
       if (isNaN(start) || isNaN(end) || start > end) {
         return res.status(400).json({
           success: false,
-          error: "Invalid startDate or endDate. Must be valid ISO dates and start <= end.",
+          error:
+            "Invalid startDate or endDate. Must be valid ISO dates and start <= end.",
         });
       }
     } else {
@@ -31,7 +32,11 @@ router.get("/", async (req, res) => {
       }
     }
 
-    const analytics = await analyticsController.getAnalytics({ range, startDate, endDate });
+    const analytics = await analyticsController.getAnalytics({
+      range,
+      startDate,
+      endDate,
+    });
     res.json(analytics); // Fixed: Return the analytics directly without extra nesting
   } catch (error) {
     console.error("Analytics route error:", error);
