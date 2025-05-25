@@ -75,6 +75,9 @@ const Dashboard = () => {
     [newOrders, orderTypeFilter]
   );
 
+  // Optimistic UI: store previous orders for rollback
+  const [prevOrders, setPrevOrders] = useState([]);
+
   // Memoized callbacks
   const handleOrderUpdate = useCallback((updatedOrder) => {
     setOrders((prevOrders) => {
@@ -84,35 +87,62 @@ const Dashboard = () => {
     });
   }, []);
 
+  // Optimistic status change
   const handleStatusChange = useCallback(async (orderId, newStatus) => {
+    // Save previous state for rollback
+    setPrevOrders(orders);
+    // Optimistically update UI
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId ? { ...o, status: newStatus } : o
+      )
+    );
     try {
       const updatedOrder = await orderService.updateOrderStatus(orderId, newStatus);
       handleOrderUpdate(updatedOrder);
       showSnackbar(`Order ${newStatus} successfully`, "success");
     } catch (err) {
+      // Rollback
+      setOrders(prevOrders);
       showSnackbar("Failed to update order status", "error");
     }
-  }, [handleOrderUpdate]);
+  }, [orders, handleOrderUpdate, prevOrders]);
 
+  // Optimistic accept order
   const handleAcceptOrder = useCallback(async (orderId) => {
+    setPrevOrders(orders);
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId ? { ...o, status: "accepted" } : o
+      )
+    );
     try {
       const updatedOrder = await orderService.updateOrderStatus(orderId, "accepted");
       handleOrderUpdate(updatedOrder);
       showSnackbar("Order accepted successfully", "success");
     } catch (err) {
+      setOrders(prevOrders);
       showSnackbar("Failed to accept order", "error");
     }
-  }, [handleOrderUpdate]);
+  }, [orders, handleOrderUpdate, prevOrders]);
 
+  // Optimistic void order
   const handleVoidOrder = useCallback(async (orderId) => {
+    setPrevOrders(orders);
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId ? { ...o, status: "voided" } : o
+      )
+    );
     try {
       const updatedOrder = await orderService.updateOrderStatus(orderId, "voided");
       handleOrderUpdate(updatedOrder);
       showSnackbar("Order voided successfully", "success");
     } catch (err) {
+      setOrders(prevOrders);
       showSnackbar("Failed to void order", "error");
     }
-  }, [handleOrderUpdate]);
+  }, [orders, handleOrderUpdate, prevOrders]);
 
   const handleManualOrderSubmit = useCallback(async (orderData) => {
     try {

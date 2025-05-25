@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Box,
   Button,
@@ -9,6 +15,7 @@ import {
   Grid,
   Alert,
   Divider,
+  CircularProgress,
 } from "@mui/material";
 import { menuService } from "../services/menuService";
 import { CurrencyContext } from "../App";
@@ -24,17 +31,78 @@ const ManualOrderEntry = ({ onOrderSubmit, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Memoized price formatter
+  const formatPrice = useCallback((price) => {
+    const numPrice = typeof price === "string" ? parseFloat(price) : price;
+    return isNaN(numPrice) ? "0.00" : numPrice.toFixed(2);
+  }, []);
+
   // Fetch menu items on component mount
   useEffect(() => {
     const fetchMenuItems = async () => {
       try {
         setLoading(true);
         setError(null);
+        console.log("Fetching menu items...");
+
         const items = await menuService.getMenuItems();
-        setMenuItems(items);
+        console.log("Fetched menu items:", items);
+
+        // More detailed validation - handle both array and object responses
+        if (!items) {
+          throw new Error("No menu items returned from service");
+        }
+
+        // Support both array and object with data property (like MenuManager does)
+        const dataArray = Array.isArray(items)
+          ? items
+          : Array.isArray(items?.data)
+          ? items.data
+          : [];
+
+        console.log("Processed data array:", dataArray);
+
+        if (dataArray.length === 0) {
+          console.warn("Menu items array is empty");
+          setError(
+            "No menu items available. Please check if menu items are configured."
+          );
+        }
+
+        // Validate item structure
+        const validItems = dataArray.filter((item) => {
+          const isValid =
+            item &&
+            typeof item.id !== "undefined" &&
+            typeof item.name === "string" &&
+            (typeof item.price === "number" || typeof item.price === "string");
+          if (!isValid) {
+            console.warn("Invalid menu item found:", item);
+          }
+          return isValid;
+        });
+
+        if (validItems.length !== dataArray.length) {
+          console.warn(
+            `Filtered out ${dataArray.length - validItems.length} invalid items`
+          );
+        }
+
+        // Format items like MenuManager does
+        const formattedItems = validItems.map((item) => ({
+          ...item,
+          price:
+            typeof item.price === "string"
+              ? parseFloat(item.price)
+              : item.price,
+        }));
+
+        setMenuItems(formattedItems);
+        console.log("Set menu items:", formattedItems);
       } catch (error) {
         console.error("Error fetching menu items:", error);
-        setError("Failed to load menu items. Please try again.");
+        setError(`Failed to load menu items: ${error.message}`);
+        setMenuItems([]); // Ensure we have an empty array
       } finally {
         setLoading(false);
       }
@@ -42,84 +110,105 @@ const ManualOrderEntry = ({ onOrderSubmit, onClose }) => {
     fetchMenuItems();
   }, []);
 
-  // Add selected item to order
-  const handleAddItem = (item) => {
+  // Memoized add item handler
+  const handleAddItem = useCallback((item) => {
     if (!item) return;
 
-    const existingItem = selectedItems.find((i) => i.item.id === item.id);
-    if (existingItem) {
-      setSelectedItems(
-        selectedItems.map((i) =>
+    setSelectedItems((prevItems) => {
+      const existingItem = prevItems.find((i) => i.item.id === item.id);
+      if (existingItem) {
+        return prevItems.map((i) =>
           i.item.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        )
-      );
-    } else {
-      setSelectedItems([...selectedItems, { item, quantity: 1 }]);
-    }
-  };
+        );
+      } else {
+        return [...prevItems, { item, quantity: 1 }];
+      }
+    });
+  }, []);
 
-  // Update item quantity
-  const handleQuantityChange = (itemId, newQuantity) => {
-    if (newQuantity < 1) {
-      setSelectedItems(selectedItems.filter((i) => i.item.id !== itemId));
-    } else {
-      setSelectedItems(
-        selectedItems.map((i) =>
+  // Memoized quantity change handler
+  const handleQuantityChange = useCallback((itemId, newQuantity) => {
+    setSelectedItems((prevItems) => {
+      if (newQuantity < 1) {
+        return prevItems.filter((i) => i.item.id !== itemId);
+      } else {
+        return prevItems.map((i) =>
           i.item.id === itemId ? { ...i, quantity: newQuantity } : i
-        )
-      );
-    }
-  };
+        );
+      }
+    });
+  }, []);
 
-  // Calculate total price
-  const totalPrice = selectedItems.reduce(
-    (sum, { item, quantity }) => sum + item.price * quantity,
-    0
-  );
+  // Memoized total price calculation
+  const totalPrice = useMemo(() => {
+    return selectedItems.reduce(
+      (sum, { item, quantity }) =>
+        sum + (parseFloat(item.price) || 0) * quantity,
+      0
+    );
+  }, [selectedItems]);
 
-  const formatPrice = (price) => {
-    const numPrice = typeof price === "string" ? parseFloat(price) : price;
-    return isNaN(numPrice) ? "0.00" : numPrice.toFixed(2);
-  };
+  // Memoized autocomplete options
+  const autocompleteOptions = useMemo(() => {
+    console.log("Creating autocomplete options from:", menuItems);
+    return menuItems || [];
+  }, [menuItems]);
 
-  // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    const orderData = {
-      customerName,
-      customerPhone,
-      type: "Phone",
-      items: selectedItems.map(({ item, quantity }) => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: quantity,
-      })),
-      totalPrice,
-      deliveryAddress,
-      specialInstructions,
-      status: "new",
-    };
-
-    onOrderSubmit(orderData);
-
-    // Reset form
+  // Memoized form reset
+  const resetForm = useCallback(() => {
     setSelectedItems([]);
     setCustomerName("");
     setCustomerPhone("");
     setDeliveryAddress("");
     setSpecialInstructions("");
+  }, []);
 
-    // Close dialog if provided
-    if (onClose) {
-      onClose();
-    }
-  };
+  // Handle form submission
+  const handleSubmit = useCallback(
+    (e) => {
+      e.preventDefault();
+
+      const orderData = {
+        customerName,
+        customerPhone,
+        type: "Phone",
+        items: selectedItems.map(({ item, quantity }) => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: quantity,
+        })),
+        totalPrice,
+        deliveryAddress,
+        specialInstructions,
+        status: "new",
+      };
+
+      onOrderSubmit(orderData);
+      resetForm();
+
+      // Close dialog if provided
+      if (onClose) {
+        onClose();
+      }
+    },
+    [
+      customerName,
+      customerPhone,
+      selectedItems,
+      totalPrice,
+      deliveryAddress,
+      specialInstructions,
+      onOrderSubmit,
+      onClose,
+      resetForm,
+    ]
+  );
 
   if (loading) {
     return (
-      <Paper sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
+      <Paper sx={{ p: 3, maxWidth: 1200, mx: "auto", textAlign: "center" }}>
+        <CircularProgress sx={{ mb: 2 }} />
         <Typography>Loading menu items...</Typography>
       </Paper>
     );
@@ -192,13 +281,20 @@ const ManualOrderEntry = ({ onOrderSubmit, onClose }) => {
           {/* Right Panel - Menu Items */}
           <Box sx={{ flex: 1.2, p: 2 }}>
             <Typography variant="h6" color="primary" gutterBottom>
-              Menu Items
+              Menu Items ({menuItems.length} available)
             </Typography>
             <Autocomplete
-              options={menuItems}
-              getOptionLabel={(option) =>
-                `${option.name} - ${currency}${formatPrice(option.price)}`
-              }
+              options={autocompleteOptions}
+              getOptionLabel={(option) => {
+                try {
+                  return `${option.name} - ${currency}${formatPrice(
+                    option.price
+                  )}`;
+                } catch (err) {
+                  console.error("Error formatting option label:", err, option);
+                  return option.name || "Unknown item";
+                }
+              }}
               onChange={(_, newValue) => handleAddItem(newValue)}
               renderInput={(params) => (
                 <TextField
@@ -206,9 +302,20 @@ const ManualOrderEntry = ({ onOrderSubmit, onClose }) => {
                   label="Add Menu Item"
                   placeholder="Search and select menu items..."
                   fullWidth
+                  helperText={
+                    menuItems.length === 0
+                      ? "No menu items available"
+                      : `${menuItems.length} items available`
+                  }
                 />
               )}
+              noOptionsText={
+                menuItems.length === 0
+                  ? "No menu items available"
+                  : "No matching items"
+              }
               sx={{ mb: 3 }}
+              key={menuItems.length} // Force re-render when menuItems changes
             />
 
             {/* Selected Items List */}
@@ -248,7 +355,7 @@ const ManualOrderEntry = ({ onOrderSubmit, onClose }) => {
                   />
                   <Typography sx={{ minWidth: 100, textAlign: "right" }}>
                     {currency}
-                    {formatPrice(item.price * quantity)}
+                    {formatPrice((parseFloat(item.price) || 0) * quantity)}
                   </Typography>
                 </Box>
               ))}
